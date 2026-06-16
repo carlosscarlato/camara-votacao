@@ -21,12 +21,14 @@ function registrarLog(
     $ip = trim(explode(',', $ip)[0]);
     $ua = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500);
 
+    $tid = defined('TENANT_ID') ? TENANT_ID : (int)($_SESSION['tenant_id'] ?? 1);
+
     try {
         db()->prepare("
             INSERT INTO logs_sistema
-                   (usuario_id, vereador_id, acao, detalhes, ip_origem, user_agent)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ")->execute([$usuarioId, $vereadorId, $acao, $detalhes, $ip, $ua]);
+                   (tenant_id, usuario_id, vereador_id, acao, detalhes, ip_origem, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ")->execute([$tid, $usuarioId, $vereadorId, $acao, $detalhes, $ip, $ua]);
     } catch (\Throwable) {
         // intencional: log nunca pode derrubar a aplicação
     }
