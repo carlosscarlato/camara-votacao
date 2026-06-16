@@ -8,7 +8,8 @@ echo "=== Deploy WebVoto SaaS ==="
 
 echo "[1/4] Atualizando código..."
 cd "$APP_DIR"
-git pull origin main
+git fetch origin main
+git reset --hard origin/main
 
 echo "[2/4] Instalando dependências Composer..."
 if [ -f composer.phar ]; then
