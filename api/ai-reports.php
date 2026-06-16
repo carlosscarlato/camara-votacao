@@ -15,7 +15,9 @@ requireAdminAuth();
 
 $apiKey = defined('ANTHROPIC_API_KEY') ? ANTHROPIC_API_KEY : (getenv('ANTHROPIC_API_KEY') ?: '');
 if (!$apiKey) {
-    jsonError('API key da IA não configurada. Contate o administrador.', 503);
+    http_response_code(503);
+    echo json_encode(['success' => false, 'disabled' => true, 'error' => 'Módulo de IA não configurado.']);
+    exit;
 }
 
 $action    = getAction();

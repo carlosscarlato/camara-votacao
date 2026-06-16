@@ -14,8 +14,16 @@ resolveTenant();
 requireAdminAuth();
 
 $apiKey = defined('ANTHROPIC_API_KEY') ? ANTHROPIC_API_KEY : (getenv('ANTHROPIC_API_KEY') ?: '');
+
+// action=status não requer key — usado pelo widget para verificar disponibilidade
+if (getAction() === 'status') {
+    jsonSuccess(['enabled' => !empty($apiKey)]);
+}
+
 if (!$apiKey) {
-    jsonError('API key da IA não configurada.', 503);
+    http_response_code(503);
+    echo json_encode(['success' => false, 'disabled' => true, 'error' => 'Módulo de IA não configurado.']);
+    exit;
 }
 
 $action  = getAction();

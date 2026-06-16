@@ -1,7 +1,14 @@
 // public/assets/js/ai-chat-widget.js — Widget flutuante de Chat IA
-(function () {
+(async function () {
   'use strict';
   const BASE = window.APP_BASE || '../..';
+
+  // Verificar se IA está habilitada antes de montar o widget
+  try {
+    const r = await fetch(`${BASE}/api/ai-chat.php?action=status`);
+    const j = await r.json();
+    if (!j.success || !j.data?.enabled) return;
+  } catch { return; }
 
   const widget = document.createElement('div');
   widget.innerHTML = `
