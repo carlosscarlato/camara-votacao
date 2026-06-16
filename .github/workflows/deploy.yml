@@ -21,6 +21,7 @@ jobs:
               echo "Clonando repositório pela primeira vez..."
               git clone https://${{ secrets.GH_PAT }}@github.com/carlosscarlato/camara-votacao.git "$REPO_DIR"
             fi
+            git config --global --add safe.directory "$REPO_DIR"
             cd "$REPO_DIR"
             git fetch origin main
             git reset --hard origin/main
