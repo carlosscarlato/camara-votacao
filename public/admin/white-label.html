@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>White Label — Configurações Visuais</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="/css/tenant.php">
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="max-w-4xl mx-auto px-4 py-10">
+  <h1 class="text-2xl font-black text-slate-800 mb-1">Configurações Visuais</h1>
+  <p class="text-slate-500 text-sm mb-8">Personalize a identidade visual do sistema para sua organização.</p>
+  <div id="msg" class="hidden mb-4 p-3 rounded-lg text-sm font-semibold"></div>
+
+  <!-- Upload de identidade visual -->
+  <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+    <h2 class="font-bold text-slate-700 mb-4">Identidade Visual</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div>
+        <label class="block text-sm font-semibold text-slate-600 mb-2">Logo (PNG/SVG)</label>
+        <div id="preview-logo" class="w-full h-16 bg-slate-100 rounded-lg flex items-center justify-center mb-2 border border-dashed border-slate-300">
+          <span class="text-slate-400 text-xs">Sem logo</span>
+        </div>
+        <input type="file" id="file-logo" accept=".png,.svg,.jpg,.jpeg,.webp" class="text-sm text-slate-500 w-full">
+        <button onclick="uploadArquivo('logo','file-logo')" class="mt-2 w-full text-xs bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg">Enviar Logo</button>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-600 mb-2">Favicon</label>
+        <div id="preview-favicon" class="w-full h-16 bg-slate-100 rounded-lg flex items-center justify-center mb-2 border border-dashed border-slate-300">
+          <span class="text-slate-400 text-xs">Sem favicon</span>
+        </div>
+        <input type="file" id="file-favicon" accept=".ico,.png,.svg" class="text-sm text-slate-500 w-full">
+        <button onclick="uploadArquivo('favicon','file-favicon')" class="mt-2 w-full text-xs bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg">Enviar Favicon</button>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-600 mb-2">Fundo do Login</label>
+        <div id="preview-login_background" class="w-full h-16 bg-slate-100 rounded-lg flex items-center justify-center mb-2 border border-dashed border-slate-300">
+          <span class="text-slate-400 text-xs">Sem imagem</span>
+        </div>
+        <input type="file" id="file-login_background" accept=".png,.jpg,.jpeg,.webp" class="text-sm text-slate-500 w-full">
+        <button onclick="uploadArquivo('login_background','file-login_background')" class="mt-2 w-full text-xs bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg">Enviar Imagem</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cores -->
+  <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+    <h2 class="font-bold text-slate-700 mb-4">Paleta de Cores</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-semibold text-slate-600 mb-1">Cor Primária</label>
+        <div class="flex items-center gap-2">
+          <input type="color" id="primary_color" class="w-10 h-10 rounded cursor-pointer border-0 p-0.5">
+          <input type="text" id="primary_color_hex" maxlength="7" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" placeholder="#1e3a5f">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-600 mb-1">Cor Secundária</label>
+        <div class="flex items-center gap-2">
+          <input type="color" id="secondary_color" class="w-10 h-10 rounded cursor-pointer border-0 p-0.5">
+          <input type="text" id="secondary_color_hex" maxlength="7" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" placeholder="#3b82f6">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-600 mb-1">Cor de Destaque</label>
+        <div class="flex items-center gap-2">
+          <input type="color" id="accent_color" class="w-10 h-10 rounded cursor-pointer border-0 p-0.5">
+          <input type="text" id="accent_color_hex" maxlength="7" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" placeholder="#10b981">
+        </div>
+      </div>
+    </div>
+    <div class="mt-4">
+      <label class="block text-sm font-semibold text-slate-600 mb-1">Fonte Principal</label>
+      <input id="font_family" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Segoe UI, Arial, sans-serif">
+    </div>
+  </section>
+
+  <!-- Dados da organização -->
+  <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+    <h2 class="font-bold text-slate-700 mb-4">Dados da Organização</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div><label class="label">Nome da Organização</label><input id="company_name" type="text" class="input" placeholder="Câmara Municipal de..."></div>
+      <div><label class="label">Slogan</label><input id="slogan" type="text" class="input" placeholder="Transparência e democracia"></div>
+      <div><label class="label">CNPJ</label><input id="cnpj" type="text" class="input" placeholder="00.000.000/0000-00"></div>
+      <div><label class="label">Telefone</label><input id="phone" type="text" class="input"></div>
+      <div><label class="label">WhatsApp</label><input id="whatsapp" type="text" class="input"></div>
+      <div><label class="label">E-mail de Contato</label><input id="email_contact" type="email" class="input"></div>
+      <div><label class="label">Website</label><input id="website" type="url" class="input"></div>
+      <div><label class="label">Instagram</label><input id="social_instagram" type="text" class="input"></div>
+    </div>
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="md:col-span-2"><label class="label">Logradouro</label><input id="address" type="text" class="input"></div>
+      <div><label class="label">Número</label><input id="number" type="text" class="input"></div>
+      <div><label class="label">Bairro</label><input id="neighborhood" type="text" class="input"></div>
+      <div><label class="label">Cidade</label><input id="city" type="text" class="input"></div>
+      <div><label class="label">Estado (UF)</label><input id="state" type="text" maxlength="2" class="input uppercase"></div>
+      <div><label class="label">CEP</label><input id="zip" type="text" class="input"></div>
+    </div>
+  </section>
+
+  <!-- CSS personalizado -->
+  <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+    <h2 class="font-bold text-slate-700 mb-1">CSS Personalizado</h2>
+    <p class="text-xs text-slate-500 mb-3">Sobreescreve estilos padrão. Use com cuidado.</p>
+    <textarea id="custom_css" rows="6" class="w-full font-mono text-sm border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="/* Seu CSS */&#10;.btn-primary { border-radius: 0; }"></textarea>
+  </section>
+
+  <div class="flex gap-3">
+    <button onclick="salvar()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-xl transition">Salvar Configurações</button>
+    <button onclick="previsualizar()" class="border border-blue-600 text-blue-600 hover:bg-blue-50 font-bold px-8 py-3 rounded-xl transition">Pré-visualizar</button>
+  </div>
+</div>
+
+<style>
+.label { display:block; font-size:.875rem; font-weight:600; color:#475569; margin-bottom:.25rem; }
+.input { width:100%; border:1px solid #cbd5e1; border-radius:.5rem; padding:.5rem .75rem; font-size:.875rem; }
+.input:focus { outline:none; box-shadow:0 0 0 2px #3b82f6; }
+</style>
+
+<script>
+const BASE = '../..';
+const campos = ['primary_color','secondary_color','accent_color','font_family',
+  'company_name','slogan','cnpj','address','number','complement','neighborhood',
+  'city','state','zip','country','phone','whatsapp','email_contact','website',
+  'social_instagram','social_facebook','social_linkedin','social_youtube',
+  'custom_css','email_footer_text','terms_of_use_url','privacy_policy_url'];
+
+async function carregar() {
+  const r = await fetch(`${BASE}/api/white-label.php?action=obter`);
+  const j = await r.json();
+  if (!j.success) return;
+  const d = j.data;
+  campos.forEach(c => {
+    const el = document.getElementById(c);
+    if (el && d[c]) el.value = d[c];
+  });
+  ['primary_color','secondary_color','accent_color'].forEach(c => {
+    const picker = document.getElementById(c);
+    const hex    = document.getElementById(c + '_hex');
+    if (picker && d[c]) { picker.value = d[c]; }
+    if (hex    && d[c]) { hex.value    = d[c]; }
+    if (picker && hex) {
+      picker.addEventListener('input', () => { hex.value = picker.value; });
+      hex.addEventListener('input',   () => {
+        if (/^#[0-9a-f]{6}$/i.test(hex.value)) picker.value = hex.value;
+      });
+    }
+  });
+}
+
+async function salvar() {
+  const body = {};
+  campos.forEach(c => {
+    const el = document.getElementById(c) || document.getElementById(c + '_hex');
+    if (el) body[c] = el.value;
+  });
+  ['primary_color','secondary_color','accent_color'].forEach(c => {
+    const hex = document.getElementById(c + '_hex');
+    if (hex) body[c] = hex.value;
+  });
+  const r = await fetch(`${BASE}/api/white-label.php?action=salvar`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const j = await r.json();
+  mostrarMsg(j.success ? j.data.message : j.error, j.success);
+}
+
+async function uploadArquivo(tipo, inputId) {
+  const file = document.getElementById(inputId)?.files[0];
+  if (!file) return alert('Selecione um arquivo primeiro.');
+  const fd = new FormData();
+  fd.append('tipo', tipo); fd.append('arquivo', file);
+  const r = await fetch(`${BASE}/api/white-label.php?action=upload_logo`, { method: 'POST', body: fd });
+  const j = await r.json();
+  mostrarMsg(j.success ? j.data.message : j.error, j.success);
+  if (j.success) {
+    const prev = document.getElementById(`preview-${tipo}`);
+    prev.innerHTML = `<img src="${BASE}/public/${j.data.path}" class="max-h-14 object-contain mx-auto">`;
+  }
+}
+
+function previsualizar() {
+  const p = document.getElementById('primary_color_hex')?.value   || '#1e3a5f';
+  const s = document.getElementById('secondary_color_hex')?.value || '#3b82f6';
+  const a = document.getElementById('accent_color_hex')?.value    || '#10b981';
+  document.documentElement.style.setProperty('--color-primary',   p);
+  document.documentElement.style.setProperty('--color-secondary', s);
+  document.documentElement.style.setProperty('--color-accent',    a);
+  mostrarMsg('Pré-visualização aplicada. Salve para tornar permanente.', true);
+}
+
+function mostrarMsg(txt, ok) {
+  const el = document.getElementById('msg');
+  el.textContent = txt;
+  el.className = `mb-4 p-3 rounded-lg text-sm font-semibold ${ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 4000);
+}
+
+carregar();
+</script>
+</body>
+</html>
