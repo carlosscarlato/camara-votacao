@@ -15,5 +15,20 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            cd /var/www/camara-votacao
-            bash deploy.sh
+            set -e
+            REPO_DIR=/var/www/camara-votacao
+            if [ ! -d "$REPO_DIR/.git" ]; then
+              echo "Clonando repositório pela primeira vez..."
+              git clone https://${{ secrets.GH_PAT }}@github.com/carlosscarlato/camara-votacao.git "$REPO_DIR"
+            else
+              echo "Atualizando repositório..."
+              cd "$REPO_DIR" && git pull origin main
+            fi
+            cd "$REPO_DIR"
+            if [ -f composer.phar ]; then
+              php composer.phar install --no-dev --optimize-autoloader --no-interaction
+            elif command -v composer &>/dev/null; then
+              composer install --no-dev --optimize-autoloader --no-interaction
+            fi
+            chown -R www-data:www-data "$REPO_DIR" 2>/dev/null || true
+            echo "Deploy concluído."
