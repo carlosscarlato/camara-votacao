@@ -3,9 +3,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
+require_once __DIR__ . '/../config/bootstrap.php';
 
 setCorsHeaders();
 startSession();
+resolveTenant();
 
 $action = getAction();
 
@@ -18,9 +20,9 @@ switch ($action) {
         $pin        = (string)requiredInput('pin');
 
         $stmt = db()->prepare(
-            "SELECT id, nome, partido, foto, pin FROM vereadores WHERE id = ? AND status = 'ativo'"
+            "SELECT id, nome, partido, foto, pin FROM vereadores WHERE id = ? AND status = 'ativo' AND tenant_id = ?"
         );
-        $stmt->execute([$vereadorId]);
+        $stmt->execute([$vereadorId, tenantId()]);
         $vereador = $stmt->fetch();
 
         if (!$vereador || $vereador['pin'] !== $pin) {
@@ -51,9 +53,9 @@ switch ($action) {
         $remember   = (bool)input('remember', false);
 
         $stmt = db()->prepare(
-            "SELECT id, nome, login, senha_hash, perfil FROM usuarios WHERE login = ? AND ativo = 1"
+            "SELECT id, nome, login, senha_hash, perfil FROM usuarios WHERE login = ? AND ativo = 1 AND tenant_id = ?"
         );
-        $stmt->execute([$loginInput]);
+        $stmt->execute([$loginInput, tenantId()]);
         $usuario = $stmt->fetch();
 
         if (!$usuario || !password_verify($senha, $usuario['senha_hash'])) {
@@ -104,17 +106,18 @@ switch ($action) {
 
     // ── Lista de vereadores para a tela de login ─────────────
     case 'lista_vereadores':
-        $stmt = db()->query(
-            "SELECT id, nome, partido, foto FROM vereadores WHERE status = 'ativo' ORDER BY nome"
+        $stmt = db()->prepare(
+            "SELECT id, nome, partido, foto FROM vereadores WHERE status = 'ativo' AND tenant_id = ? ORDER BY nome"
         );
+        $stmt->execute([tenantId()]);
         jsonSuccess($stmt->fetchAll());
 
     // ── Esqueci a senha (solicitar token) ─────────────────────
     case 'esqueci_senha':
         $email = trim((string)requiredInput('email'));
 
-        $stmt = db()->prepare("SELECT id, nome FROM usuarios WHERE email = ? AND ativo = 1");
-        $stmt->execute([$email]);
+        $stmt = db()->prepare("SELECT id, nome FROM usuarios WHERE email = ? AND ativo = 1 AND tenant_id = ?");
+        $stmt->execute([$email, tenantId()]);
         $usuario = $stmt->fetch();
 
         // Sempre retorna sucesso (não revelar se e-mail existe)

@@ -18,6 +18,9 @@ header('Access-Control-Allow-Origin: *');
 while (ob_get_level() > 0) ob_end_clean();
 
 require_once __DIR__ . '/../config/helpers.php';
+require_once __DIR__ . '/../config/bootstrap.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
+resolveTenant();
 startSession();
 
 // Lê os dados necessários da sessão...

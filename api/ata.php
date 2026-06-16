@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
+require_once __DIR__ . '/../config/bootstrap.php';
 
 setCorsHeaders();
+startSession();
+resolveTenant();
 $auth = requireAdminAuth();
 
 $ordemDiaId = (int)($_GET['ordem_dia_id'] ?? 0);
