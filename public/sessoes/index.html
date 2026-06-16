@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Histórico de Sessões — Câmara Municipal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8fafc; }
+  .card { transition: box-shadow .2s, transform .2s; }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,.1); }
+  .badge { font-size:.65rem; padding:2px 9px; border-radius:999px; font-weight:700; text-transform:uppercase; }
+  .badge-ord { background:#dbeafe; color:#1e40af; }
+  .badge-ext { background:#fef3c7; color:#92400e; }
+  .badge-esp { background:#f3e8ff; color:#6b21a8; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:50; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .voto-sim  { background:#dcfce7; color:#166534; }
+  .voto-nao  { background:#fee2e2; color:#991b1b; }
+  .voto-abst { background:#fef9c3; color:#854d0e; }
+  .voto-aus  { background:#f1f5f9; color:#64748b; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="bg-white shadow-sm sticky top-0 z-40">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="../" class="text-slate-400 hover:text-blue-600 transition text-sm font-semibold">← Início</a>
+      <span class="text-slate-300">|</span>
+      <div class="flex items-center gap-2">
+        <span class="text-2xl">🏛️</span>
+        <div>
+          <p class="font-extrabold text-slate-800 leading-tight">Câmara Municipal</p>
+          <p class="text-xs text-slate-500">Histórico de Sessões Plenárias</p>
+        </div>
+      </div>
+    </div>
+    <a href="../publico/" class="text-sm text-blue-600 font-semibold hover:underline">Portal de Transparência →</a>
+  </div>
+</header>
+
+<!-- Hero -->
+<div class="bg-gradient-to-r from-slate-800 to-slate-700 text-white py-10 px-4">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-black mb-2">Histórico de Sessões Plenárias</h1>
+    <p class="text-slate-300">Todas as sessões realizadas — clique em uma sessão para ver os resultados detalhados das votações.</p>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="max-w-6xl mx-auto px-4 py-6">
+  <div class="flex gap-3 flex-wrap">
+    <select id="sel-tipo" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+      <option value="">Todos os tipos</option>
+      <option value="ordinaria">Ordinária</option>
+      <option value="extraordinaria">Extraordinária</option>
+      <option value="especial">Especial</option>
+    </select>
+    <input id="inp-busca" type="search" placeholder="Buscar por número..." class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 flex-1 min-w-[160px]">
+  </div>
+</div>
+
+<!-- Grid de sessões -->
+<div class="max-w-6xl mx-auto px-4 pb-16">
+  <div id="grid-sessoes" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div class="col-span-3 text-center py-16 text-slate-400">Carregando sessões...</div>
+  </div>
+  <div id="div-paginacao" class="flex justify-center gap-2 mt-8"></div>
+</div>
+
+<!-- Modal detalhe sessão -->
+<div id="modal" class="hidden modal-overlay" onclick="if(event.target===this)fecharModal()">
+  <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div class="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+      <div>
+        <p id="modal-titulo" class="font-black text-slate-800 text-lg"></p>
+        <p id="modal-subtitulo" class="text-slate-500 text-sm"></p>
+      </div>
+      <button onclick="fecharModal()" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button>
+    </div>
+    <div id="modal-corpo" class="px-6 py-5 space-y-5"></div>
+  </div>
+</div>
+
+<script>
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s ?? '';
+  return d.innerHTML;
+}
+
+const BASE = '../..';
+let todasSessoes = [];
+let pagina = 1;
+
+async function carregarHistorico() {
+  const r = await fetch(`${BASE}/api/resultados_publicos.php?action=historico&pagina=1`);
+  const json = await r.json();
+  if (!json.success) return;
+
+  // Agrupar por sessão
+  const map = {};
+  (json.data.votacoes || []).forEach(v => {
+    const k = v.sessao_numero + '|' + v.sessao_data;
+    if (!map[k]) {
+      map[k] = {
+        numero: v.sessao_numero,
+        data:   v.sessao_data,
+        tipo:   v.sessao_tipo || 'ordinaria',
+        itens:  [],
+        aprov:  0, rejeit: 0, empate: 0,
+      };
+    }
+    map[k].itens.push(v);
+    if (v.resultado === 'aprovado')  map[k].aprov++;
+    if (v.resultado === 'rejeitado') map[k].rejeit++;
+    if (v.resultado === 'empate')    map[k].empate++;
+  });
+
+  todasSessoes = Object.values(map).sort((a, b) => b.data.localeCompare(a.data));
+  renderGrid();
+}
+
+function filtrar() {
+  const tipo  = document.getElementById('sel-tipo').value;
+  const busca = document.getElementById('inp-busca').value.toLowerCase();
+  return todasSessoes.filter(s =>
+    (!tipo  || s.tipo  === tipo) &&
+    (!busca || s.numero.toLowerCase().includes(busca))
+  );
+}
+
+function renderGrid() {
+  const lista = filtrar();
+  const grid  = document.getElementById('grid-sessoes');
+  if (!lista.length) {
+    grid.innerHTML = '<div class="col-span-3 text-center py-16 text-slate-400">Nenhuma sessão encontrada.</div>';
+    return;
+  }
+
+  const tl = { ordinaria:'Ordinária', extraordinaria:'Extraordinária', especial:'Especial' };
+  const bc = { ordinaria:'badge-ord', extraordinaria:'badge-ext', especial:'badge-esp' };
+  grid.innerHTML = lista.map(s => {
+    const data = s.data ? s.data.split('-').reverse().join('/') : '';
+    return `
+      <div class="card bg-white border border-slate-200 rounded-2xl p-5 cursor-pointer" onclick='abrirSessao(${JSON.stringify(s.numero)})'>
+        <div class="flex items-start justify-between mb-3">
+          <span class="badge ${bc[s.tipo]||'badge-ord'}">${tl[s.tipo] ? escHtml(tl[s.tipo]) : escHtml(s.tipo)}</span>
+          <span class="text-xs text-slate-400 font-semibold">${data}</span>
+        </div>
+        <h3 class="text-slate-800 font-black text-lg mb-3">Sessão nº ${escHtml(s.numero)}</h3>
+        <div class="flex gap-3 text-xs font-bold">
+          <span class="bg-green-50 text-green-700 px-2 py-1 rounded-full">✔ ${s.aprov} Aprovada(s)</span>
+          <span class="bg-red-50 text-red-700 px-2 py-1 rounded-full">✗ ${s.rejeit} Rejeitada(s)</span>
+          ${s.empate ? `<span class="bg-blue-50 text-blue-700 px-2 py-1 rounded-full">≈ ${s.empate} Empate(s)</span>` : ''}
+        </div>
+        <p class="text-slate-400 text-xs mt-3">${s.itens.length} item(s) na pauta · clique para detalhes</p>
+      </div>`;
+  }).join('');
+}
+
+function abrirSessao(numero) {
+  const s = todasSessoes.find(x => x.numero === numero);
+  if (!s) return;
+
+  const tl = { ordinaria:'Ordinária', extraordinaria:'Extraordinária', especial:'Especial' };
+  const data = s.data ? s.data.split('-').reverse().join('/') : '';
+  document.getElementById('modal-titulo').textContent    = `Sessão nº ${s.numero}`;
+  document.getElementById('modal-subtitulo').textContent = `${tl[s.tipo]||s.tipo} — ${data}`;
+
+  const corpo = document.getElementById('modal-corpo');
+  corpo.innerHTML = s.itens.map(item => {
+    const resMap = {
+      aprovado:  ['bg-green-100 text-green-800','✓ Aprovado'],
+      rejeitado: ['bg-red-100 text-red-800','✗ Rejeitado'],
+      empate:    ['bg-blue-100 text-blue-800','≈ Empate'],
+    };
+    const [resCls, resTxt] = resMap[item.resultado] || ['bg-slate-100 text-slate-600', item.resultado];
+    return `
+      <div class="border border-slate-200 rounded-xl p-4">
+        <div class="flex items-start justify-between gap-3 mb-2 flex-wrap">
+          <p class="font-bold text-slate-800 text-sm">${escHtml(item.prop_tipo)} nº ${escHtml(item.prop_numero)}/${escHtml(item.prop_ano)}</p>
+          <span class="text-xs font-bold px-3 py-1 rounded-full ${resCls}">${resTxt}</span>
+        </div>
+        <p class="text-slate-500 text-xs leading-relaxed mb-2">${escHtml(item.prop_ementa)}</p>
+        <div class="flex gap-2 flex-wrap text-xs font-bold">
+          <span class="bg-green-50 text-green-700 px-2 py-1 rounded">✔ ${item.votos_sim} SIM</span>
+          <span class="bg-red-50 text-red-700 px-2 py-1 rounded">✗ ${item.votos_nao} NÃO</span>
+          <span class="bg-yellow-50 text-yellow-700 px-2 py-1 rounded">≈ ${item.votos_abstencao} ABST.</span>
+        </div>
+        <button onclick="verDetalhe(${item.ordem_dia_id})" class="text-blue-600 text-xs mt-2 hover:underline">Ver votação nominal →</button>
+      </div>`;
+  }).join('');
+
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+async function verDetalhe(ordemDiaId) {
+  fecharModal();
+  const r    = await fetch(`${BASE}/api/resultados_publicos.php?action=detalhe&ordem_dia_id=${ordemDiaId}`);
+  const json = await r.json();
+  if (!json.success) { alert('Erro ao carregar detalhe.'); return; }
+
+  const { votacao, votos } = json.data;
+  const resMap = {
+    aprovado:  ['bg-green-100 border-green-300 text-green-800','✓ APROVADO'],
+    rejeitado: ['bg-red-100 border-red-300 text-red-800','✗ REJEITADO'],
+    empate:    ['bg-blue-100 border-blue-300 text-blue-800','≈ EMPATE'],
+  };
+  const [rCls, rTxt] = resMap[votacao.resultado] || ['bg-slate-100 border-slate-300 text-slate-700', votacao.resultado];
+  const vMap = { SIM:'voto-sim', NAO:'voto-nao', ABSTENCAO:'voto-abst', AUSENTE:'voto-aus' };
+  const vLabel = { SIM:'✔ SIM', NAO:'✘ NÃO', ABSTENCAO:'≈ ABST.', AUSENTE:'— AUSENTE' };
+
+  document.getElementById('modal-titulo').textContent    = `${votacao.tipo} nº ${votacao.numero}/${votacao.ano}`;
+  document.getElementById('modal-subtitulo').textContent = `Sessão ${votacao.sessao_numero}`;
+  document.getElementById('modal-corpo').innerHTML = `
+    <div class="border rounded-xl p-4 text-center ${rCls}">
+      <p class="text-xl font-black">${rTxt}</p>
+      <p class="text-sm mt-1">${votacao.votos_sim} SIM · ${votacao.votos_nao} NÃO · ${votacao.votos_abstencao} ABST. · ${votacao.votos_ausente} Ausentes</p>
+    </div>
+    <p class="text-slate-600 text-sm leading-relaxed">${escHtml(votacao.ementa)}</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      ${votos.map(v => `
+        <div class="flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2">
+          <div>
+            <p class="text-sm font-semibold text-slate-800">${escHtml(v.nome)}</p>
+            <p class="text-xs text-slate-400">${escHtml(v.partido)}</p>
+          </div>
+          <span class="text-xs font-bold px-2 py-1 rounded ${vMap[v.voto]||''}">${vLabel[v.voto] ? escHtml(vLabel[v.voto]) : escHtml(v.voto)}</span>
+        </div>`).join('')}
+    </div>`;
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function fecharModal() { document.getElementById('modal').classList.add('hidden'); }
+document.getElementById('sel-tipo').addEventListener('change', renderGrid);
+document.getElementById('inp-busca').addEventListener('input', renderGrid);
+
+carregarHistorico();
+</script>
+</body>
+</html>

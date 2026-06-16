@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Câmara Municipal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  body { background: #f1f5f9; font-family: 'Segoe UI', Arial, sans-serif; }
+  .sidebar { width: 240px; min-height: 100vh; background: #0f172a; }
+  .nav-link { display:flex; align-items:center; gap:10px; padding:10px 16px; color:#94a3b8; border-radius:8px; font-size:.875rem; font-weight:600; transition:.15s; cursor:pointer; }
+  .nav-link:hover, .nav-link.ativo { background:#1e293b; color:#fff; }
+  .kpi-card { background:#fff; border-radius:16px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,.06); transition:transform .2s; }
+  .kpi-card:hover { transform:translateY(-2px); }
+  .login-overlay { position:fixed; inset:0; background:#060d1c; display:flex; align-items:center; justify-content:center; z-index:100; }
+</style>
+</head>
+<body class="flex">
+
+<!-- ── Login overlay ────────────────────────────────────────── -->
+<div id="overlay" class="login-overlay">
+  <div class="bg-slate-800 rounded-2xl p-8 w-full max-w-sm shadow-2xl">
+    <div class="text-center mb-6">
+      <div class="text-4xl mb-2">🏛️</div>
+      <h1 class="text-white font-black text-xl">Painel Administrativo</h1>
+      <p class="text-slate-400 text-sm">Câmara Municipal</p>
+    </div>
+    <div class="space-y-4">
+      <input id="inp-login" type="text" placeholder="login" autocomplete="username"
+        class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-400">
+      <input id="inp-senha" type="password" placeholder="••••••••" autocomplete="current-password"
+        class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-400">
+      <button onclick="fazerLogin()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-xl transition">Entrar</button>
+      <p id="login-erro" class="text-red-400 text-sm text-center hidden"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Sidebar ───────────────────────────────────────────────── -->
+<aside class="sidebar flex-shrink-0 flex flex-col py-6 px-3">
+  <div class="text-center mb-8 px-3">
+    <div class="text-3xl mb-1">🏛️</div>
+    <p class="text-white font-bold text-sm leading-tight">Câmara Municipal</p>
+    <p class="text-slate-500 text-xs">Painel Admin</p>
+  </div>
+  <nav class="space-y-1 flex-1">
+    <div onclick="mostrarSecao('dashboard')" class="nav-link ativo" id="nav-dashboard">📊 Dashboard</div>
+    <div onclick="mostrarSecao('usuarios')"  class="nav-link" id="nav-usuarios">👥 Usuários</div>
+    <a href="usuarios.html" class="nav-link">⚙️ Gerenciar Acesso</a>
+    <a href="../controle/" class="nav-link">🖥️ Terminal Controle</a>
+    <a href="../publico/"  class="nav-link">🔍 Portal Público</a>
+  </nav>
+  <div class="mt-auto pt-4 border-t border-slate-800">
+    <p id="sdr-usuario" class="text-slate-500 text-xs px-2 mb-2"></p>
+    <div onclick="sair()" class="nav-link text-red-400 hover:text-red-300">🚪 Sair</div>
+  </div>
+</aside>
+
+<!-- ── Main ──────────────────────────────────────────────────── -->
+<main class="flex-1 overflow-auto p-6">
+
+  <!-- ── Seção Dashboard ──────────────────────────────────── -->
+  <section id="sec-dashboard">
+    <h2 class="text-xl font-black text-slate-800 mb-6">Dashboard Analytics</h2>
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8" id="kpis">
+      <div class="kpi-card"><p class="text-3xl font-black text-blue-600" id="kpi-sessoes">—</p><p class="text-slate-500 text-xs font-semibold mt-1 uppercase">Sessões</p></div>
+      <div class="kpi-card"><p class="text-3xl font-black text-green-600" id="kpi-aprovadas">—</p><p class="text-slate-500 text-xs font-semibold mt-1 uppercase">Aprovadas</p></div>
+      <div class="kpi-card"><p class="text-3xl font-black text-red-600" id="kpi-rejeitadas">—</p><p class="text-slate-500 text-xs font-semibold mt-1 uppercase">Rejeitadas</p></div>
+      <div class="kpi-card"><p class="text-3xl font-black text-purple-600" id="kpi-vereadores">—</p><p class="text-slate-500 text-xs font-semibold mt-1 uppercase">Vereadores</p></div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div class="bg-white rounded-2xl p-5 shadow-sm">
+        <h3 class="font-bold text-slate-700 text-sm uppercase mb-4 tracking-wider">Votações por Mês</h3>
+        <canvas id="chart-mes" height="200"></canvas>
+      </div>
+      <div class="bg-white rounded-2xl p-5 shadow-sm">
+        <h3 class="font-bold text-slate-700 text-sm uppercase mb-4 tracking-wider">Resultado Geral</h3>
+        <canvas id="chart-resultado" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Assiduidade -->
+    <div class="bg-white rounded-2xl p-5 shadow-sm mb-8">
+      <h3 class="font-bold text-slate-700 text-sm uppercase mb-4 tracking-wider">Assiduidade dos Vereadores</h3>
+      <canvas id="chart-assiduidade" height="120"></canvas>
+    </div>
+
+    <!-- Últimas sessões -->
+    <div class="bg-white rounded-2xl p-5 shadow-sm">
+      <h3 class="font-bold text-slate-700 text-sm uppercase mb-4 tracking-wider">Últimas Sessões</h3>
+      <div id="tabela-sessoes" class="overflow-x-auto">
+        <p class="text-slate-400 text-sm text-center py-4">Carregando...</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Seção Logs ──────────────────────────────────────── -->
+  <section id="sec-usuarios" class="hidden">
+    <h2 class="text-xl font-black text-slate-800 mb-6">Logs de Auditoria</h2>
+    <div class="bg-white rounded-2xl p-5 shadow-sm">
+      <div id="tabela-logs" class="overflow-x-auto">
+        <p class="text-slate-400 text-sm text-center py-4">Carregando logs...</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s ?? '';
+  return d.innerHTML;
+}
+
+const BASE = '../..';
+let chartMes, chartResultado, chartAssiduidade;
+
+// ── Login ──────────────────────────────────────────────────────
+async function fazerLogin() {
+  const login = document.getElementById('inp-login').value.trim();
+  const senha = document.getElementById('inp-senha').value;
+  const errEl = document.getElementById('login-erro');
+  errEl.classList.add('hidden');
+
+  const r = await fetch(`${BASE}/api/auth.php?action=login_admin`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ login, senha }),
+  });
+  const json = await r.json();
+  if (!json.success) { errEl.textContent = json.error; errEl.classList.remove('hidden'); return; }
+  if (json.data.perfil !== 'admin') { errEl.textContent = 'Acesso restrito a administradores.'; errEl.classList.remove('hidden'); return; }
+
+  document.getElementById('sdr-usuario').textContent = json.data.nome;
+  document.getElementById('overlay').style.display = 'none';
+  carregarDashboard();
+}
+document.getElementById('inp-senha').addEventListener('keydown', e => { if(e.key==='Enter') fazerLogin(); });
+
+async function sair() {
+  await fetch(`${BASE}/api/auth.php?action=logout`);
+  location.reload();
+}
+
+// ── Navegação ──────────────────────────────────────────────────
+function mostrarSecao(nome) {
+  ['dashboard','usuarios'].forEach(s => {
+    document.getElementById(`sec-${s}`).classList.toggle('hidden', s !== nome);
+    document.getElementById(`nav-${s}`).classList.toggle('ativo', s === nome);
+  });
+  if (nome === 'usuarios') carregarLogs();
+}
+
+// ── Dashboard ──────────────────────────────────────────────────
+async function carregarDashboard() {
+  await Promise.all([carregarKPIs(), carregarGraficos(), carregarTabelaSessoes()]);
+}
+
+async function carregarKPIs() {
+  const r = await fetch(`${BASE}/api/analytics.php?action=resumo`);
+  const j = await r.json();
+  if (!j.success) return;
+  const d = j.data;
+  document.getElementById('kpi-sessoes').textContent    = d.sessoes_encerradas ?? '—';
+  document.getElementById('kpi-aprovadas').textContent  = d.aprovadas ?? '—';
+  document.getElementById('kpi-rejeitadas').textContent = d.rejeitadas ?? '—';
+  document.getElementById('kpi-vereadores').textContent = d.vereadores_ativos ?? '—';
+}
+
+async function carregarGraficos() {
+  const [rMes, rAss] = await Promise.all([
+    fetch(`${BASE}/api/analytics.php?action=votacoes_por_mes`).then(r => r.json()),
+    fetch(`${BASE}/api/analytics.php?action=assiduidade`).then(r => r.json()),
+  ]);
+  const rResumo = await fetch(`${BASE}/api/analytics.php?action=resumo`).then(r => r.json());
+
+  // Gráfico: votações por mês
+  if (rMes.success && rMes.data.length) {
+    const labels = rMes.data.map(r => r.mes_label);
+    const aprov  = rMes.data.map(r => parseInt(r.aprovadas)||0);
+    const rejeit = rMes.data.map(r => parseInt(r.rejeitadas)||0);
+    if (chartMes) chartMes.destroy();
+    chartMes = new Chart(document.getElementById('chart-mes'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label:'Aprovadas',  data:aprov,  backgroundColor:'#22c55e', borderRadius:6 },
+          { label:'Rejeitadas', data:rejeit, backgroundColor:'#ef4444', borderRadius:6 },
+        ],
+      },
+      options: { responsive:true, plugins:{ legend:{ position:'bottom' } }, scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, ticks:{stepSize:1}} } },
+    });
+  } else {
+    document.getElementById('chart-mes').parentElement.innerHTML += '<p class="text-slate-400 text-xs text-center mt-4">Sem dados de votações ainda.</p>';
+  }
+
+  // Gráfico: resultado geral (pizza)
+  if (rResumo.success) {
+    const d = rResumo.data;
+    if (chartResultado) chartResultado.destroy();
+    chartResultado = new Chart(document.getElementById('chart-resultado'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Aprovadas','Rejeitadas','Empates'],
+        datasets:[{ data:[d.aprovadas||0, d.rejeitadas||0, d.empates||0], backgroundColor:['#22c55e','#ef4444','#3b82f6'], borderWidth:2 }],
+      },
+      options: { responsive:true, plugins:{ legend:{ position:'bottom' } } },
+    });
+  }
+
+  // Gráfico: assiduidade
+  if (rAss.success && rAss.data.length) {
+    const labels = rAss.data.map(v => v.nome.split(' ')[0]);
+    const pct    = rAss.data.map(v => parseFloat(v.pct_presenca)||0);
+    if (chartAssiduidade) chartAssiduidade.destroy();
+    chartAssiduidade = new Chart(document.getElementById('chart-assiduidade'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets:[{ label:'% Presença', data:pct, backgroundColor: pct.map(p => p>=80?'#22c55e':p>=60?'#f59e0b':'#ef4444'), borderRadius:6 }],
+      },
+      options: { responsive:true, indexAxis:'y', plugins:{ legend:{ display:false } }, scales:{ x:{ min:0, max:100, ticks:{ callback:v=>v+'%' } } } },
+    });
+  }
+}
+
+async function carregarTabelaSessoes() {
+  const r = await fetch(`${BASE}/api/analytics.php?action=ultimas_sessoes`);
+  const j = await r.json();
+  if (!j.success || !j.data.length) { document.getElementById('tabela-sessoes').innerHTML = '<p class="text-slate-400 text-sm text-center py-4">Sem sessões.</p>'; return; }
+  const tl = { ordinaria:'Ordinária', extraordinaria:'Extraordinária', especial:'Especial' };
+  const rows = j.data.map(s => {
+    const data = s.data ? s.data.split('-').reverse().join('/') : '';
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50">
+      <td class="py-3 px-4 text-sm font-semibold text-slate-700">nº ${escHtml(s.numero)}</td>
+      <td class="py-3 px-4 text-xs text-slate-500">${data}</td>
+      <td class="py-3 px-4 text-xs">${tl[s.tipo] ? escHtml(tl[s.tipo]) : escHtml(s.tipo)}</td>
+      <td class="py-3 px-4 text-xs"><span class="text-green-600 font-bold">${s.aprovados||0}✔</span> <span class="text-red-500 font-bold ml-2">${s.rejeitados||0}✗</span></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tabela-sessoes').innerHTML = `
+    <table class="w-full text-left text-sm">
+      <thead><tr class="text-xs text-slate-400 font-semibold uppercase border-b border-slate-200">
+        <th class="pb-2 px-4">Sessão</th><th class="pb-2 px-4">Data</th><th class="pb-2 px-4">Tipo</th><th class="pb-2 px-4">Resultado</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+async function carregarLogs() {
+  const r = await fetch(`${BASE}/api/admin.php?action=listar_logs&limit=50`);
+  const j = await r.json();
+  if (!j.success) { document.getElementById('tabela-logs').innerHTML = '<p class="text-red-400 text-sm text-center py-4">Sem permissão ou erro ao carregar logs.</p>'; return; }
+  const rows = j.data.logs.map(l => `
+    <tr class="border-b border-slate-100 hover:bg-slate-50 text-sm">
+      <td class="py-2 px-4 font-mono text-xs text-slate-400">${escHtml(l.created_at)}</td>
+      <td class="py-2 px-4 font-semibold text-slate-700">${escHtml(l.acao)}</td>
+      <td class="py-2 px-4 text-slate-500">${l.usuario_nome ? escHtml(l.usuario_nome) : '—'}</td>
+      <td class="py-2 px-4 text-slate-400 text-xs">${escHtml(l.ip_origem)}</td>
+      <td class="py-2 px-4 text-slate-400 text-xs">${l.detalhes ? escHtml(l.detalhes) : ''}</td>
+    </tr>`).join('');
+  document.getElementById('tabela-logs').innerHTML = `
+    <table class="w-full text-left min-w-max">
+      <thead><tr class="text-xs text-slate-400 font-semibold uppercase border-b border-slate-200">
+        <th class="pb-2 px-4">Data/Hora</th><th class="pb-2 px-4">Ação</th><th class="pb-2 px-4">Usuário</th><th class="pb-2 px-4">IP</th><th class="pb-2 px-4">Detalhes</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// Verificar sessão ativa
+fetch(`${BASE}/api/auth.php?action=status`).then(r=>r.json()).then(j=>{
+  if (j.success && j.data.autenticado && j.data.tipo === 'admin') {
+    document.getElementById('sdr-usuario').textContent = j.data.nome;
+    document.getElementById('overlay').style.display = 'none';
+    carregarDashboard();
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerenciamento de Acesso — Câmara Municipal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #f1f5f9; font-family: 'Segoe UI', Arial, sans-serif; }
+  .sidebar { width:240px; min-height:100vh; background:#0f172a; }
+  .nav-link { display:flex; align-items:center; gap:10px; padding:10px 16px; color:#94a3b8; border-radius:8px; font-size:.875rem; font-weight:600; transition:.15s; cursor:pointer; }
+  .nav-link:hover, .nav-link.ativo { background:#1e293b; color:#fff; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:50; display:flex; align-items:center; justify-content:center; padding:16px; }
+  input, select { border:1px solid #cbd5e1; border-radius:8px; padding:8px 12px; font-size:.9rem; width:100%; }
+  input:focus, select:focus { outline:none; border-color:#3b82f6; }
+  label { font-size:.8rem; color:#64748b; font-weight:600; display:block; margin-bottom:4px; }
+  .login-overlay { position:fixed; inset:0; background:#060d1c; display:flex; align-items:center; justify-content:center; z-index:100; }
+</style>
+</head>
+<body class="flex">
+
+<!-- Login overlay -->
+<div id="overlay" class="login-overlay">
+  <div class="bg-slate-800 rounded-2xl p-8 w-full max-w-sm shadow-2xl">
+    <div class="text-center mb-6">
+      <div class="text-4xl mb-2">🏛️</div>
+      <h1 class="text-white font-black text-xl">Painel Administrativo</h1>
+    </div>
+    <div class="space-y-4">
+      <input id="inp-login" type="text" placeholder="login" class="bg-slate-700 border border-slate-600 text-white focus:border-blue-400">
+      <input id="inp-senha" type="password" placeholder="••••••••" class="bg-slate-700 border border-slate-600 text-white focus:border-blue-400">
+      <button onclick="fazerLogin()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-xl">Entrar</button>
+      <p id="login-erro" class="text-red-400 text-sm text-center hidden"></p>
+    </div>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<aside class="sidebar flex-shrink-0 flex flex-col py-6 px-3">
+  <div class="text-center mb-8 px-3">
+    <div class="text-3xl mb-1">🏛️</div>
+    <p class="text-white font-bold text-sm">Câmara Municipal</p>
+    <p class="text-slate-500 text-xs">Controle de Acesso</p>
+  </div>
+  <nav class="space-y-1 flex-1">
+    <a href="index.html"      class="nav-link">📊 Dashboard</a>
+    <div onclick="setTab('usuarios')"  class="nav-link ativo" id="nav-usuarios">👥 Usuários da Mesa</div>
+    <div onclick="setTab('vereadores')" class="nav-link" id="nav-vereadores">🏛️ Vereadores</div>
+    <a href="../controle/"    class="nav-link">🖥️ Terminal Controle</a>
+  </nav>
+  <div class="mt-auto pt-4 border-t border-slate-800">
+    <p id="sdr-usuario" class="text-slate-500 text-xs px-2 mb-2"></p>
+    <div onclick="sair()" class="nav-link text-red-400">🚪 Sair</div>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="flex-1 overflow-auto p-6">
+
+  <!-- Usuários -->
+  <section id="sec-usuarios">
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <h2 class="text-xl font-black text-slate-800">Usuários da Mesa Diretora</h2>
+      <button onclick="abrirModalUsuario()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-sm transition">+ Novo Usuário</button>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead><tr class="bg-slate-50 border-b border-slate-200 text-xs text-slate-400 font-semibold uppercase">
+          <th class="py-3 px-5 text-left">Nome</th>
+          <th class="py-3 px-5 text-left">Login</th>
+          <th class="py-3 px-5 text-left">E-mail</th>
+          <th class="py-3 px-5 text-left">Perfil</th>
+          <th class="py-3 px-5 text-left">Status</th>
+          <th class="py-3 px-5 text-left">Ações</th>
+        </tr></thead>
+        <tbody id="tbody-usuarios"><tr><td colspan="6" class="text-center py-8 text-slate-400">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Vereadores -->
+  <section id="sec-vereadores" class="hidden">
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <h2 class="text-xl font-black text-slate-800">Vereadores</h2>
+      <button onclick="abrirModalVereador()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-sm transition">+ Novo Vereador</button>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead><tr class="bg-slate-50 border-b border-slate-200 text-xs text-slate-400 font-semibold uppercase">
+          <th class="py-3 px-5 text-left">Foto</th>
+          <th class="py-3 px-5 text-left">Nome</th>
+          <th class="py-3 px-5 text-left">Partido</th>
+          <th class="py-3 px-5 text-left">E-mail</th>
+          <th class="py-3 px-5 text-left">PIN</th>
+          <th class="py-3 px-5 text-left">Status</th>
+          <th class="py-3 px-5 text-left">Ações</th>
+        </tr></thead>
+        <tbody id="tbody-vereadores"><tr><td colspan="7" class="text-center py-8 text-slate-400">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<!-- Modal Usuário -->
+<div id="modal-usuario" class="hidden modal-overlay" onclick="if(event.target===this)fecharModais()">
+  <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 id="modal-u-titulo" class="font-black text-slate-800 text-lg">Novo Usuário</h3>
+      <button onclick="fecharModais()" class="text-slate-400 text-2xl leading-none">×</button>
+    </div>
+    <input type="hidden" id="u-id">
+    <div><label>Nome Completo</label><input id="u-nome" type="text" placeholder="Ex: Maria da Silva"></div>
+    <div><label>Login</label><input id="u-login" type="text" placeholder="Ex: maria.silva"></div>
+    <div><label>E-mail</label><input id="u-email" type="email" placeholder="Ex: maria@camara.gov.br"></div>
+    <div><label>Perfil</label>
+      <select id="u-perfil">
+        <option value="operador">Operador de Sessão</option>
+        <option value="admin">Administrador</option>
+      </select>
+    </div>
+    <div><label>Senha <span id="u-senha-hint" class="text-slate-400 font-normal">(obrigatória no cadastro)</span></label>
+      <input id="u-senha" type="password" placeholder="Mínimo 8 caracteres">
+    </div>
+    <div id="u-ativo-wrapper" class="hidden">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input id="u-ativo" type="checkbox" checked class="accent-blue-600 w-4 h-4"> Usuário ativo
+      </label>
+    </div>
+    <p id="u-msg" class="text-sm hidden"></p>
+    <div class="flex gap-3 pt-2">
+      <button onclick="salvarUsuario()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition text-sm">Salvar</button>
+      <button onclick="fecharModais()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition text-sm">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Vereador -->
+<div id="modal-vereador" class="hidden modal-overlay" onclick="if(event.target===this)fecharModais()">
+  <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 id="modal-v-titulo" class="font-black text-slate-800 text-lg">Novo Vereador</h3>
+      <button onclick="fecharModais()" class="text-slate-400 text-2xl leading-none">×</button>
+    </div>
+    <input type="hidden" id="v-id">
+    <!-- Foto -->
+    <div class="flex flex-col items-center gap-1 pb-1">
+      <div class="relative cursor-pointer group" onclick="document.getElementById('v-foto-input').click()">
+        <img id="v-foto-preview" src="../../assets/img/default-avatar.svg" alt="Foto"
+          class="w-24 h-24 rounded-full object-cover border-4 border-slate-200 group-hover:opacity-70 transition">
+        <div class="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/40">
+          <span class="text-white text-xs font-bold">📷 Alterar</span>
+        </div>
+      </div>
+      <input type="file" id="v-foto-input" accept="image/jpeg,image/png,image/webp,image/svg+xml" class="hidden" onchange="previewFoto(this)">
+      <p class="text-slate-400 text-xs">Clique na foto para alterar</p>
+    </div>
+    <div><label>Nome Completo</label><input id="v-nome" type="text"></div>
+    <div><label>Partido</label><input id="v-partido" type="text" placeholder="Ex: PT, PL, MDB"></div>
+    <div><label>E-mail</label><input id="v-email" type="email"></div>
+    <div><label>PIN (6 dígitos)</label><input id="v-pin" type="text" maxlength="6" inputmode="numeric" placeholder="123456"></div>
+    <div>
+      <label>Cargo</label>
+      <select id="v-cargo">
+        <option value="1">Vereador</option>
+        <option value="2">Presidente da Câmara</option>
+        <option value="3">Vice-Presidente</option>
+      </select>
+    </div>
+    <div id="v-status-wrapper" class="hidden">
+      <label>Status</label>
+      <select id="v-status"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
+    </div>
+    <p id="v-msg" class="text-sm hidden"></p>
+    <div class="flex gap-3 pt-2">
+      <button onclick="salvarVereador()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition text-sm">Salvar</button>
+      <button onclick="fecharModais()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition text-sm">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s ?? '';
+  return d.innerHTML;
+}
+
+const BASE = '../..';
+
+async function fazerLogin() {
+  const login = document.getElementById('inp-login').value.trim();
+  const senha = document.getElementById('inp-senha').value;
+  const errEl = document.getElementById('login-erro');
+  errEl.classList.add('hidden');
+  const r = await fetch(`${BASE}/api/auth.php?action=login_admin`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({login,senha}),
+  });
+  const j = await r.json();
+  if (!j.success || j.data.perfil !== 'admin') { errEl.textContent = j.error || 'Apenas administradores.'; errEl.classList.remove('hidden'); return; }
+  document.getElementById('sdr-usuario').textContent = j.data.nome;
+  document.getElementById('overlay').style.display = 'none';
+  carregarUsuarios(); carregarVereadores();
+}
+document.getElementById('inp-senha').addEventListener('keydown', e => { if(e.key==='Enter') fazerLogin(); });
+
+async function sair() { await fetch(`${BASE}/api/auth.php?action=logout`); location.reload(); }
+
+function setTab(t) {
+  ['usuarios','vereadores'].forEach(s => {
+    document.getElementById(`sec-${s}`).classList.toggle('hidden', s!==t);
+    document.getElementById(`nav-${s}`).classList.toggle('ativo', s===t);
+  });
+}
+
+// ── Usuários ──────────────────────────────────────────────────
+async function carregarUsuarios() {
+  const r = await fetch(`${BASE}/api/admin.php?action=listar_usuarios`);
+  const j = await r.json();
+  if (!j.success) return;
+  const perfilLabel = { admin:'<span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-bold">Admin</span>', operador:'<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">Operador</span>' };
+  document.getElementById('tbody-usuarios').innerHTML = j.data.map(u => `
+    <tr class="border-b border-slate-100 hover:bg-slate-50">
+      <td class="py-3 px-5 font-semibold text-slate-800">${escHtml(u.nome)}</td>
+      <td class="py-3 px-5 text-slate-600 font-mono text-xs">${escHtml(u.login)}</td>
+      <td class="py-3 px-5 text-slate-500 text-xs">${u.email ? escHtml(u.email) : '—'}</td>
+      <td class="py-3 px-5">${perfilLabel[u.perfil]||u.perfil}</td>
+      <td class="py-3 px-5"><span class="${u.ativo ? 'text-green-600' : 'text-red-400'} font-semibold text-xs">${u.ativo?'✓ Ativo':'✗ Inativo'}</span></td>
+      <td class="py-3 px-5">
+        <button onclick='editarUsuario(${JSON.stringify(u)})' class="text-blue-600 hover:underline text-xs font-semibold mr-3">Editar</button>
+        <button onclick="resetarSenhaModal(${u.id},'${u.nome}')" class="text-amber-600 hover:underline text-xs font-semibold">Reset Senha</button>
+      </td>
+    </tr>`).join('');
+}
+
+function abrirModalUsuario() {
+  document.getElementById('u-id').value = '';
+  ['u-nome','u-login','u-email','u-senha'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('u-perfil').value = 'operador';
+  document.getElementById('u-ativo-wrapper').classList.add('hidden');
+  document.getElementById('u-senha-hint').textContent = '(obrigatória no cadastro)';
+  document.getElementById('modal-u-titulo').textContent = 'Novo Usuário';
+  document.getElementById('u-msg').classList.add('hidden');
+  document.getElementById('modal-usuario').classList.remove('hidden');
+}
+
+function editarUsuario(u) {
+  document.getElementById('u-id').value    = u.id;
+  document.getElementById('u-nome').value  = u.nome;
+  document.getElementById('u-login').value = u.login;
+  document.getElementById('u-email').value = u.email || '';
+  document.getElementById('u-perfil').value = u.perfil;
+  document.getElementById('u-ativo').checked = !!u.ativo;
+  document.getElementById('u-senha').value = '';
+  document.getElementById('u-ativo-wrapper').classList.remove('hidden');
+  document.getElementById('u-senha-hint').textContent = '(deixe vazio para não alterar)';
+  document.getElementById('modal-u-titulo').textContent = 'Editar Usuário';
+  document.getElementById('u-msg').classList.add('hidden');
+  document.getElementById('modal-usuario').classList.remove('hidden');
+}
+
+async function salvarUsuario() {
+  const id    = document.getElementById('u-id').value;
+  const nome  = document.getElementById('u-nome').value.trim();
+  const login = document.getElementById('u-login').value.trim();
+  const email = document.getElementById('u-email').value.trim();
+  const perfil= document.getElementById('u-perfil').value;
+  const senha = document.getElementById('u-senha').value;
+  const ativo = document.getElementById('u-ativo').checked;
+  const msgEl = document.getElementById('u-msg');
+  msgEl.classList.add('hidden');
+
+  let r, body;
+  if (!id) {
+    if (!senha) { msgEl.textContent='Senha obrigatória.'; msgEl.className='text-sm text-red-500'; msgEl.classList.remove('hidden'); return; }
+    body = { nome,login,email,perfil,senha };
+    r = await fetch(`${BASE}/api/admin.php?action=criar_usuario`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  } else {
+    body = { id:Number(id),nome,email,perfil,ativo };
+    r = await fetch(`${BASE}/api/admin.php?action=editar_usuario`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    if (senha) {
+      await fetch(`${BASE}/api/admin.php?action=resetar_senha`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:Number(id),senha}) });
+    }
+  }
+  const j = await r.json();
+  msgEl.textContent  = j.success ? '✅ Salvo com sucesso!' : '❌ '+(j.error||'Erro.');
+  msgEl.className    = j.success ? 'text-sm text-green-700 font-semibold' : 'text-sm text-red-500';
+  msgEl.classList.remove('hidden');
+  if (j.success) { setTimeout(() => fecharModais(), 1200); carregarUsuarios(); }
+}
+
+async function resetarSenhaModal(id, nome) {
+  const nova = prompt(`Nova senha para ${nome} (mín. 8 chars):`);
+  if (!nova) return;
+  const r = await fetch(`${BASE}/api/admin.php?action=resetar_senha`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id,senha:nova}) });
+  const j = await r.json();
+  alert(j.success ? '✅ Senha resetada!' : '❌ '+j.error);
+}
+
+// ── Vereadores ────────────────────────────────────────────────
+async function carregarVereadores() {
+  const r = await fetch(`${BASE}/api/admin.php?action=listar_vereadores`);
+  const j = await r.json();
+  if (!j.success) return;
+  const cargo = { 1:'Vereador', 2:'Presidente', 3:'Vice-Pres.' };
+  const defaultFoto = '../assets/img/default-avatar.svg';
+  document.getElementById('tbody-vereadores').innerHTML = j.data.map(v => `
+    <tr class="border-b border-slate-100 hover:bg-slate-50">
+      <td class="py-3 px-5">
+        <img src="${v.foto ? `${BASE}/public/${v.foto}` : defaultFoto}" alt="${escHtml(v.nome)}"
+          class="w-10 h-10 rounded-full object-cover border-2 border-slate-200"
+          onerror="this.src='${defaultFoto}'">
+      </td>
+      <td class="py-3 px-5 font-semibold text-slate-800">${escHtml(v.nome)}</td>
+      <td class="py-3 px-5 text-slate-600">${escHtml(v.partido)}</td>
+      <td class="py-3 px-5 text-slate-500 text-xs">${v.email ? escHtml(v.email) : '—'}</td>
+      <td class="py-3 px-5 font-mono text-xs text-slate-500">${v.pin}</td>
+      <td class="py-3 px-5"><span class="${v.status==='ativo'?'text-green-600':'text-red-400'} font-semibold text-xs">${v.status==='ativo'?'✓ Ativo':'✗ Inativo'}</span></td>
+      <td class="py-3 px-5">
+        <button onclick='editarVereador(${JSON.stringify(v)})' class="text-blue-600 hover:underline text-xs font-semibold mr-3">Editar</button>
+        <button onclick="deletarVereador(${v.id},'${v.nome.replace(/'/g,"\\'")}')" class="text-red-500 hover:underline text-xs font-semibold">Excluir</button>
+      </td>
+    </tr>`).join('');
+}
+
+function previewFoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => { document.getElementById('v-foto-preview').src = e.target.result; };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function abrirModalVereador() {
+  document.getElementById('v-id').value = '';
+  ['v-nome','v-partido','v-email','v-pin'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('v-cargo').value = '1';
+  document.getElementById('v-status-wrapper').classList.add('hidden');
+  document.getElementById('modal-v-titulo').textContent = 'Novo Vereador';
+  document.getElementById('v-msg').classList.add('hidden');
+  document.getElementById('v-foto-input').value = '';
+  document.getElementById('v-foto-preview').src = '../assets/img/default-avatar.svg';
+  document.getElementById('modal-vereador').classList.remove('hidden');
+}
+
+function editarVereador(v) {
+  document.getElementById('v-id').value      = v.id;
+  document.getElementById('v-nome').value    = v.nome;
+  document.getElementById('v-partido').value = v.partido;
+  document.getElementById('v-email').value   = v.email || '';
+  document.getElementById('v-pin').value     = '';
+  document.getElementById('v-cargo').value   = v.cargo_id || 1;
+  document.getElementById('v-status').value  = v.status;
+  document.getElementById('v-status-wrapper').classList.remove('hidden');
+  document.getElementById('modal-v-titulo').textContent = 'Editar Vereador';
+  document.getElementById('v-msg').classList.add('hidden');
+  document.getElementById('v-foto-input').value = '';
+  const fotoSrc = v.foto ? `${BASE}/public/${v.foto}` : '../assets/img/default-avatar.svg';
+  document.getElementById('v-foto-preview').src = fotoSrc;
+  document.getElementById('modal-vereador').classList.remove('hidden');
+}
+
+async function salvarVereador() {
+  const id      = document.getElementById('v-id').value;
+  const nome    = document.getElementById('v-nome').value.trim();
+  const partido = document.getElementById('v-partido').value.trim();
+  const email   = document.getElementById('v-email').value.trim();
+  const pin     = document.getElementById('v-pin').value.trim();
+  const cargo   = document.getElementById('v-cargo').value;
+  const status  = document.getElementById('v-status').value;
+  const msgEl   = document.getElementById('v-msg');
+  msgEl.classList.add('hidden');
+
+  const action = id ? 'editar_vereador' : 'criar_vereador';
+  const body   = id ? { id:Number(id),nome,partido,email,pin,cargo_id:Number(cargo),status }
+                    : { nome,partido,email,pin,cargo_id:Number(cargo) };
+
+  const r = await fetch(`${BASE}/api/admin.php?action=${action}`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body),
+  });
+  const j = await r.json();
+  if (!j.success) {
+    msgEl.textContent = '❌ '+(j.error||'Erro.');
+    msgEl.className   = 'text-sm text-red-500';
+    msgEl.classList.remove('hidden');
+    return;
+  }
+
+  // Upload foto se selecionada
+  const fotoInput  = document.getElementById('v-foto-input');
+  const vereadorId = id || j.data?.id;
+  if (fotoInput.files.length > 0 && vereadorId) {
+    const fd = new FormData();
+    fd.append('id',   vereadorId);
+    fd.append('foto', fotoInput.files[0]);
+    const rf = await fetch(`${BASE}/api/admin.php?action=upload_foto_vereador`, { method:'POST', body:fd });
+    const jf = await rf.json();
+    if (!jf.success) {
+      msgEl.textContent = '⚠️ Dados salvos, mas erro na foto: '+(jf.error||'');
+      msgEl.className   = 'text-sm text-amber-600 font-semibold';
+      msgEl.classList.remove('hidden');
+      carregarVereadores();
+      setTimeout(() => fecharModais(), 2000);
+      return;
+    }
+  }
+
+  msgEl.textContent = '✅ Salvo!';
+  msgEl.className   = 'text-sm text-green-700 font-semibold';
+  msgEl.classList.remove('hidden');
+  carregarVereadores();
+  setTimeout(() => fecharModais(), 1200);
+}
+
+async function deletarVereador(id, nome) {
+  if (!confirm(`Excluir permanentemente o vereador "${nome}"?\n\nEsta ação não pode ser desfeita.`)) return;
+  const r = await fetch(`${BASE}/api/admin.php?action=deletar_vereador`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}),
+  });
+  const j = await r.json();
+  if (j.success) {
+    carregarVereadores();
+  } else {
+    alert('❌ ' + (j.error || 'Erro ao excluir.'));
+  }
+}
+
+function fecharModais() {
+  document.getElementById('modal-usuario').classList.add('hidden');
+  document.getElementById('modal-vereador').classList.add('hidden');
+}
+
+// Auto-login se sessão ativa
+fetch(`${BASE}/api/auth.php?action=status`).then(r=>r.json()).then(j=>{
+  if (j.success && j.data.autenticado && j.data.tipo === 'admin') {
+    document.getElementById('sdr-usuario').textContent = j.data.nome;
+    document.getElementById('overlay').style.display = 'none';
+    carregarUsuarios(); carregarVereadores();
+  }
+});
+</script>
+</body>
+</html>

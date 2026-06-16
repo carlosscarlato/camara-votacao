@@ -1,0 +1,7 @@
+Options -Indexes
+
+# Bloqueia acesso a arquivos sensíveis na raiz do projeto
+<FilesMatch "\.(sql|log|bak|sh|env)$">
+    Order deny,allow
+    Deny from all
+</FilesMatch>

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal de Transparência – Votações Legislativas</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #f8fafc; color: #1e293b; font-family: 'Segoe UI', sans-serif; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; }
+  .badge { font-size: .7rem; padding: 3px 10px; border-radius: 999px; font-weight: 700; text-transform: uppercase; }
+  .badge-ap  { background: #dcfce7; color: #166534; }
+  .badge-rej { background: #fee2e2; color: #991b1b; }
+  .badge-emp { background: #dbeafe; color: #1e40af; }
+  .voto-sim  { background: #dcfce7; color: #166534; }
+  .voto-nao  { background: #fee2e2; color: #991b1b; }
+  .voto-abst { background: #fef9c3; color: #854d0e; }
+  .voto-aus  { background: #f1f5f9; color: #64748b; }
+  input, select {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: .9rem;
+    background: #fff;
+    width: 100%;
+  }
+  input:focus, select:focus { outline: none; border-color: #2563eb; }
+  .trow { cursor: pointer; transition: background .15s; }
+  .trow:hover { background: #f0f9ff; }
+  .bar { height: 20px; border-radius: 4px; transition: width .6s ease; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal-box { background: #fff; border-radius: 16px; max-width: 640px; width: 100%; max-height: 90vh; overflow-y: auto; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header cívico -->
+<header class="bg-blue-900 text-white px-6 py-5">
+  <div class="max-w-5xl mx-auto flex items-center justify-between flex-wrap gap-4">
+    <div>
+      <h1 class="text-2xl font-extrabold">🏛️ Portal de Transparência</h1>
+      <p class="text-blue-300 text-sm">Câmara Municipal – Votações Legislativas</p>
+    </div>
+    <a href="../painel/" target="_blank"
+      class="bg-white/10 hover:bg-white/20 text-white text-sm px-4 py-2 rounded-lg font-semibold transition border border-white/20">
+      📺 Ver Painel ao Vivo
+    </a>
+  </div>
+</header>
+
+<!-- Barra de busca -->
+<div class="bg-blue-800 px-6 py-4">
+  <div class="max-w-5xl mx-auto flex gap-3 flex-wrap">
+    <input id="inp-busca" type="search" placeholder="Buscar por ementa, autor ou número..."
+      class="flex-1 min-w-[200px] text-slate-800">
+    <button id="btn-buscar" class="bg-blue-500 hover:bg-blue-400 text-white font-bold px-6 py-2 rounded-lg transition">
+      🔍 Buscar
+    </button>
+  </div>
+</div>
+
+<!-- Corpo -->
+<main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+  <!-- Estatísticas rápidas -->
+  <div id="div-stats" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="card text-center">
+      <p class="text-3xl font-black text-blue-700" id="stat-total">—</p>
+      <p class="text-slate-500 text-xs font-semibold uppercase mt-1">Votações</p>
+    </div>
+    <div class="card text-center">
+      <p class="text-3xl font-black text-green-700" id="stat-aprov">—</p>
+      <p class="text-slate-500 text-xs font-semibold uppercase mt-1">Aprovadas</p>
+    </div>
+    <div class="card text-center">
+      <p class="text-3xl font-black text-red-700" id="stat-rejeit">—</p>
+      <p class="text-slate-500 text-xs font-semibold uppercase mt-1">Rejeitadas</p>
+    </div>
+    <div class="card text-center">
+      <p class="text-3xl font-black text-slate-700" id="stat-empate">—</p>
+      <p class="text-slate-500 text-xs font-semibold uppercase mt-1">Empates</p>
+    </div>
+  </div>
+
+  <!-- Resultados de busca -->
+  <div id="div-busca" class="hidden card">
+    <p class="text-slate-500 text-xs font-bold uppercase mb-3">Resultados da Busca</p>
+    <div id="lista-busca"></div>
+  </div>
+
+  <!-- Histórico de votações -->
+  <div class="card">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <p class="text-slate-500 text-xs font-bold uppercase">Histórico de Votações</p>
+      <div class="flex gap-2">
+        <select id="sel-filtro" class="text-sm py-1 w-auto">
+          <option value="">Todos</option>
+          <option value="aprovado">Aprovadas</option>
+          <option value="rejeitado">Rejeitadas</option>
+          <option value="empate">Empates</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-200 text-left">
+            <th class="pb-2 text-slate-400 font-semibold text-xs pr-4">Data</th>
+            <th class="pb-2 text-slate-400 font-semibold text-xs pr-4">Proposição</th>
+            <th class="pb-2 text-slate-400 font-semibold text-xs pr-4">Ementa</th>
+            <th class="pb-2 text-slate-400 font-semibold text-xs pr-4">Resultado</th>
+            <th class="pb-2 text-slate-400 font-semibold text-xs">Placar</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-historico">
+          <tr><td colspan="5" class="text-slate-400 text-center py-8">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginação -->
+    <div id="div-paginacao" class="flex justify-center gap-2 mt-4"></div>
+  </div>
+</main>
+
+<!-- Modal detalhe votação -->
+<div id="modal" class="hidden modal-overlay">
+  <div class="modal-box">
+    <div class="border-b border-slate-200 px-6 py-4 flex items-start justify-between gap-4">
+      <div>
+        <p id="modal-tipo" class="text-xs text-slate-400 font-semibold uppercase"></p>
+        <h2 id="modal-titulo" class="text-slate-800 font-bold text-lg leading-tight"></h2>
+        <p id="modal-sessao" class="text-slate-400 text-xs mt-1"></p>
+      </div>
+      <button id="btn-fechar-modal" class="text-slate-400 hover:text-slate-700 text-2xl leading-none flex-shrink-0">×</button>
+    </div>
+
+    <div class="px-6 py-4 space-y-5">
+      <!-- Resultado destaque -->
+      <div id="modal-resultado-card" class="rounded-xl p-4 text-center">
+        <p id="modal-resultado-txt" class="text-2xl font-black uppercase"></p>
+        <p id="modal-placar-txt" class="text-sm font-semibold mt-1 opacity-80"></p>
+      </div>
+
+      <!-- Barra visual do placar -->
+      <div id="modal-barra-placar" class="space-y-2"></div>
+
+      <!-- Ementa -->
+      <div>
+        <p class="text-xs text-slate-400 font-semibold uppercase mb-1">Ementa</p>
+        <p id="modal-ementa" class="text-slate-700 text-sm leading-relaxed"></p>
+      </div>
+
+      <!-- Votos individuais -->
+      <div>
+        <p class="text-xs text-slate-400 font-semibold uppercase mb-2">Votação Nominal</p>
+        <div id="modal-votos" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s ?? '';
+  return d.innerHTML;
+}
+
+const BASE = '../..';
+let paginaAtual = 1;
+let totalVotacoes = 0;
+let filtroAtual = '';
+
+// ── Carregar histórico ────────────────────────────────────
+async function carregarHistorico(pagina = 1) {
+  paginaAtual = pagina;
+  const r = await fetch(`${BASE}/api/resultados_publicos.php?action=historico&pagina=${pagina}`);
+  const json = await r.json();
+
+  if (!json.success) return;
+  const { votacoes, total } = json.data;
+  totalVotacoes = total;
+
+  // Estatísticas
+  const stats = votacoes.reduce((acc, v) => {
+    acc.total++;
+    if (v.resultado === 'aprovado')  acc.aprov++;
+    if (v.resultado === 'rejeitado') acc.rejeit++;
+    if (v.resultado === 'empate')    acc.empate++;
+    return acc;
+  }, { total: 0, aprov: 0, rejeit: 0, empate: 0 });
+
+  document.getElementById('stat-total').textContent  = total;
+  document.getElementById('stat-aprov').textContent  = stats.aprov;
+  document.getElementById('stat-rejeit').textContent = stats.rejeit;
+  document.getElementById('stat-empate').textContent = stats.empate;
+
+  let filtradas = votacoes;
+  if (filtroAtual) filtradas = votacoes.filter(v => v.resultado === filtroAtual);
+
+  renderTabela(filtradas);
+  renderPaginacao(total, pagina);
+}
+
+function renderTabela(votacoes) {
+  const tbody = document.getElementById('tbody-historico');
+  if (!votacoes.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-slate-400 text-center py-8">Nenhuma votação encontrada.</td></tr>';
+    return;
+  }
+
+  const badgeMap = {
+    aprovado:  ['badge-ap', '✓ Aprovado'],
+    rejeitado: ['badge-rej', '✗ Rejeitado'],
+    empate:    ['badge-emp', '≈ Empate'],
+    nao_votado: ['', 'Não votado'],
+  };
+
+  tbody.innerHTML = votacoes.map(v => {
+    const [bdCls, bdTxt] = badgeMap[v.resultado] || ['', v.resultado];
+    const data = formatarData(v.sessao_data);
+    const ementa = v.prop_ementa.length > 70 ? v.prop_ementa.substring(0, 70) + '...' : v.prop_ementa;
+
+    return `
+      <tr class="trow border-b border-slate-100" onclick="abrirDetalhe(${v.ordem_dia_id})">
+        <td class="py-3 pr-4 text-slate-500 text-xs whitespace-nowrap">${data}</td>
+        <td class="py-3 pr-4 font-semibold text-slate-700 whitespace-nowrap">
+          ${escHtml(v.prop_tipo.split(' ').slice(0,2).join(' '))} ${escHtml(v.prop_numero)}/${escHtml(v.prop_ano)}
+        </td>
+        <td class="py-3 pr-4 text-slate-600 text-xs">${escHtml(ementa)}</td>
+        <td class="py-3 pr-4"><span class="badge ${bdCls}">${bdTxt}</span></td>
+        <td class="py-3 text-xs text-slate-500 whitespace-nowrap">
+          <span class="text-green-700 font-bold">${v.votos_sim}S</span>
+          <span class="text-red-700 font-bold ml-1">${v.votos_nao}N</span>
+          <span class="text-amber-700 font-bold ml-1">${v.votos_abstencao}A</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderPaginacao(total, pagina) {
+  const totalPag = Math.ceil(total / 20);
+  const divPag = document.getElementById('div-paginacao');
+  if (totalPag <= 1) { divPag.innerHTML = ''; return; }
+
+  let html = '';
+  for (let i = 1; i <= totalPag; i++) {
+    const ativo = i === pagina ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200';
+    html += `<button onclick="carregarHistorico(${i})" class="${ativo} px-3 py-1 rounded-lg text-sm font-semibold transition">${i}</button>`;
+  }
+  divPag.innerHTML = html;
+}
+
+// ── Detalhe votação ───────────────────────────────────────
+async function abrirDetalhe(ordemDiaId) {
+  const r = await fetch(`${BASE}/api/resultados_publicos.php?action=detalhe&ordem_dia_id=${ordemDiaId}`);
+  const json = await r.json();
+  if (!json.success) { alert('Erro ao carregar detalhe.'); return; }
+
+  const { votacao, votos } = json.data;
+
+  document.getElementById('modal-tipo').textContent    = votacao.tipo + ' nº ' + votacao.numero + '/' + votacao.ano;
+  document.getElementById('modal-titulo').textContent  = votacao.ementa.substring(0, 120) + (votacao.ementa.length > 120 ? '...' : '');
+  document.getElementById('modal-sessao').textContent  = `Sessão ${votacao.sessao_numero} – ${formatarData(votacao.sessao_data)}`;
+  document.getElementById('modal-ementa').textContent  = votacao.ementa;
+
+  // Resultado
+  const resMap = {
+    aprovado:  ['bg-green-100 border border-green-300', 'text-green-800', '✓ APROVADO'],
+    rejeitado: ['bg-red-100 border border-red-300',     'text-red-800',   '✗ REJEITADO'],
+    empate:    ['bg-blue-100 border border-blue-300',   'text-blue-800',  '≈ EMPATE'],
+  };
+  const [cardCls, txtCls, resTxt] = resMap[votacao.resultado] || ['bg-slate-100 border border-slate-300', 'text-slate-700', votacao.resultado];
+  const resCard = document.getElementById('modal-resultado-card');
+  const resTxtEl = document.getElementById('modal-resultado-txt');
+  resCard.className = `rounded-xl p-4 text-center ${cardCls}`;
+  resTxtEl.className = `text-2xl font-black uppercase ${txtCls}`;
+  resTxtEl.textContent = resTxt;
+  document.getElementById('modal-placar-txt').textContent =
+    `${votacao.votos_sim} SIM  •  ${votacao.votos_nao} NÃO  •  ${votacao.votos_abstencao} Abstenções  •  ${votacao.votos_ausente} Ausentes`;
+
+  // Barra visual
+  const total = votos.length || 1;
+  document.getElementById('modal-barra-placar').innerHTML = `
+    <div class="flex rounded-lg overflow-hidden h-5">
+      <div class="bar bg-green-500" style="width:${(votacao.votos_sim/total*100).toFixed(1)}%"></div>
+      <div class="bar bg-red-500"   style="width:${(votacao.votos_nao/total*100).toFixed(1)}%"></div>
+      <div class="bar bg-amber-400" style="width:${(votacao.votos_abstencao/total*100).toFixed(1)}%"></div>
+      <div class="bar bg-slate-300" style="width:${(votacao.votos_ausente/total*100).toFixed(1)}%"></div>
+    </div>
+    <div class="flex gap-4 text-xs text-slate-500 mt-1">
+      <span class="text-green-700 font-bold">${votacao.votos_sim} SIM</span>
+      <span class="text-red-700 font-bold">${votacao.votos_nao} NÃO</span>
+      <span class="text-amber-700 font-bold">${votacao.votos_abstencao} ABST.</span>
+      <span class="text-slate-500">${votacao.votos_ausente} Ausentes</span>
+    </div>
+  `;
+
+  // Votos individuais
+  const votoClsMap = {
+    SIM: 'voto-sim', NAO: 'voto-nao', ABSTENCAO: 'voto-abst', AUSENTE: 'voto-aus'
+  };
+  const votoLabelMap = {
+    SIM: '✔ SIM', NAO: '✘ NÃO', ABSTENCAO: '≈ ABST.', AUSENTE: '— AUSENTE'
+  };
+  document.getElementById('modal-votos').innerHTML = votos.map(v => `
+    <div class="flex items-center justify-between gap-2 border border-slate-200 rounded-lg px-3 py-2">
+      <div class="flex items-center gap-2">
+        <img src="${BASE}/public/${v.foto || 'assets/img/default-avatar.svg'}" alt="${escHtml(v.nome)}"
+          class="w-8 h-8 rounded-full object-cover border border-slate-200"
+          onerror="this.src='${BASE}/public/assets/img/default-avatar.svg'">
+        <div>
+          <p class="text-sm font-semibold text-slate-800 leading-tight">${escHtml(v.nome)}</p>
+          <p class="text-xs text-slate-400">${escHtml(v.partido)}</p>
+        </div>
+      </div>
+      <span class="badge ${votoClsMap[v.voto] || ''}">${votoLabelMap[v.voto] ? escHtml(votoLabelMap[v.voto]) : escHtml(v.voto)}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+document.getElementById('btn-fechar-modal').addEventListener('click', () => {
+  document.getElementById('modal').classList.add('hidden');
+});
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) {
+    document.getElementById('modal').classList.add('hidden');
+  }
+});
+
+// ── Busca ─────────────────────────────────────────────────
+document.getElementById('btn-buscar').addEventListener('click', buscar);
+document.getElementById('inp-busca').addEventListener('keydown', e => {
+  if (e.key === 'Enter') buscar();
+});
+
+async function buscar() {
+  const q = document.getElementById('inp-busca').value.trim();
+  if (!q) {
+    document.getElementById('div-busca').classList.add('hidden');
+    return;
+  }
+
+  const r = await fetch(`${BASE}/api/resultados_publicos.php?action=buscar&q=${encodeURIComponent(q)}`);
+  const json = await r.json();
+
+  const divBusca  = document.getElementById('div-busca');
+  const listaBusca = document.getElementById('lista-busca');
+  divBusca.classList.remove('hidden');
+
+  if (!json.data?.length) {
+    listaBusca.innerHTML = '<p class="text-slate-400 text-sm text-center py-4">Nenhum resultado encontrado.</p>';
+    return;
+  }
+
+  const statusMap = {
+    aprovado: 'badge-ap', rejeitado: 'badge-rej', em_tramitacao: 'badge-emp'
+  };
+
+  listaBusca.innerHTML = json.data.map(p => `
+    <div class="border border-slate-200 rounded-xl p-4 hover:bg-slate-50 transition">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <p class="font-bold text-slate-800">${escHtml(p.tipo)} nº ${escHtml(p.numero)}/${escHtml(p.ano)}</p>
+          <p class="text-slate-600 text-sm mt-1">${escHtml(p.ementa)}</p>
+          ${p.autor ? `<p class="text-slate-400 text-xs mt-1">Autoria: ${escHtml(p.autor)}</p>` : ''}
+        </div>
+        <span class="badge ${statusMap[p.status] || 'bg-slate-100 text-slate-500'} flex-shrink-0">
+          ${escHtml(p.status.replace('_', ' '))}
+        </span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Filtro ────────────────────────────────────────────────
+document.getElementById('sel-filtro').addEventListener('change', function() {
+  filtroAtual = this.value;
+  carregarHistorico(1);
+});
+
+// ── Utilitários ───────────────────────────────────────────
+function formatarData(d) {
+  if (!d) return '';
+  const [ano, mes, dia] = d.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
+// ── Init ──────────────────────────────────────────────────
+carregarHistorico();
+</script>
+</body>
+</html>

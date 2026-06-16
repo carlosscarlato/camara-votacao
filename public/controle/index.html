@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terminal de Controle – Mesa Diretora</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0f172a; color: #f1f5f9; font-family: 'Segoe UI', sans-serif; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 20px; }
+  .card-title { color: #94a3b8; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .btn-primary { background: #2563eb; color: #fff; font-weight: 700; padding: 10px 20px; border-radius: 10px; transition: background .2s; cursor: pointer; border: none; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-primary:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+  .btn-success { background: #16a34a; }
+  .btn-success:hover { background: #15803d; }
+  .btn-danger  { background: #dc2626; }
+  .btn-danger:hover  { background: #b91c1c; }
+  .btn-warn    { background: #b45309; }
+  .btn-warn:hover    { background: #92400e; }
+  .btn-gray    { background: #475569; }
+  .btn-gray:hover    { background: #334155; }
+  .btn-sm { padding: 6px 14px; font-size: .8rem; border-radius: 8px; }
+  input, select, textarea {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #f1f5f9;
+    border-radius: 8px;
+    padding: 8px 12px;
+    width: 100%;
+    font-size: .9rem;
+  }
+  input:focus, select:focus { outline: none; border-color: #2563eb; }
+  label { font-size: .8rem; color: #94a3b8; display: block; margin-bottom: 4px; font-weight: 600; }
+  .status-badge { font-size: .65rem; padding: 3px 10px; border-radius: 999px; font-weight: 700; text-transform: uppercase; }
+  .badge-andamento { background: #064e3b; color: #34d399; }
+  .badge-pendente   { background: #1e3a5f; color: #93c5fd; }
+  .badge-votando    { background: #451a03; color: #fbbf24; animation: pulse 1.2s infinite; }
+  .badge-discussao  { background: #1e1b4b; color: #a78bfa; }
+  .badge-encerrada  { background: #1f2937; color: #9ca3af; }
+  .badge-agendada   { background: #1e3a5f; color: #93c5fd; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+  .item-od {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 12px 16px;
+    transition: border-color .2s;
+  }
+  .item-od.ativo { border-color: #fbbf24; background: #1c1407; }
+  .login-overlay { position: fixed; inset: 0; background: #060d1c; display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 200;
+    background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    padding: 14px 20px; max-width: 320px; font-size: .9rem;
+    transform: translateX(120%); transition: transform .3s ease;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5);
+  }
+  .toast.show { transform: translateX(0); }
+  .toast.success { border-color: #16a34a; }
+  .toast.error   { border-color: #dc2626; }
+</style>
+</head>
+<body>
+
+<!-- ── Login Overlay ──────────────────────────────────────── -->
+<div id="login-overlay" class="login-overlay">
+  <div class="card w-full max-w-sm">
+    <div class="text-center mb-6">
+      <div class="text-4xl mb-2">🏛️</div>
+      <h1 class="text-xl font-bold text-white">Terminal de Controle</h1>
+      <p class="text-slate-400 text-sm">Mesa Diretora</p>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label>Login</label>
+        <input id="inp-login" type="text" placeholder="admin" autocomplete="username">
+      </div>
+      <div>
+        <label>Senha</label>
+        <input id="inp-senha" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button id="btn-login" class="btn-primary w-full py-3 rounded-xl text-base">Entrar</button>
+      <p id="login-erro" class="text-red-400 text-sm text-center hidden"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── App Principal ───────────────────────────────────────── -->
+<div id="app" class="hidden">
+
+  <!-- Header -->
+  <header class="bg-slate-900 border-b border-slate-700 px-6 py-3 flex items-center justify-between sticky top-0 z-10">
+    <div class="flex items-center gap-3">
+      <span class="text-2xl">🏛️</span>
+      <div>
+        <h1 class="text-white font-bold text-lg leading-tight">Terminal de Controle</h1>
+        <p id="hdr-usuario" class="text-slate-400 text-xs"></p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="hdr-sessao-status" class="text-xs text-slate-400">Sem sessão ativa</div>
+      <button id="btn-logout-admin" class="text-slate-500 text-sm hover:text-white transition">Sair</button>
+    </div>
+  </header>
+
+  <div class="p-4 space-y-4 max-w-7xl mx-auto">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+      <!-- ── Card: Sessão ──────────────────────────────────── -->
+      <div class="card">
+        <div class="card-title">📋 Sessão Plenária</div>
+
+        <div id="sessao-ativa-info" class="hidden mb-4 p-3 bg-emerald-950 border border-emerald-700 rounded-xl">
+          <p class="text-emerald-400 text-xs font-bold uppercase">Sessão em Andamento</p>
+          <p id="txt-sessao-ativa" class="text-white font-semibold text-sm mt-1"></p>
+          <button id="btn-encerrar-sessao"
+            class="btn-primary btn-danger btn-sm mt-3 w-full">
+            Encerrar Sessão
+          </button>
+        </div>
+
+        <div id="form-sessao" class="space-y-3">
+          <div>
+            <label>Número da Sessão</label>
+            <input id="inp-num-sessao" type="text" placeholder="001/2024">
+          </div>
+          <div>
+            <label>Data</label>
+            <input id="inp-data-sessao" type="date">
+          </div>
+          <div>
+            <label>Tipo</label>
+            <select id="sel-tipo-sessao">
+              <option value="ordinaria">Ordinária</option>
+              <option value="extraordinaria">Extraordinária</option>
+              <option value="especial">Especial</option>
+            </select>
+          </div>
+          <button id="btn-iniciar-sessao" class="btn-primary btn-success w-full">
+            ▶ Iniciar Sessão
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Card: Tribuna ─────────────────────────────────── -->
+      <div class="card">
+        <div class="card-title">🎤 Controle da Tribuna</div>
+
+        <div id="tribuna-ativa-info" class="hidden mb-4 p-3 bg-amber-950 border border-amber-700 rounded-xl">
+          <p class="text-amber-400 text-xs font-bold uppercase">Na Tribuna</p>
+          <p id="txt-tribuna-ativa" class="text-white font-semibold text-sm mt-1"></p>
+          <p id="txt-tribuna-timer" class="text-amber-300 font-mono text-2xl font-black mt-1"></p>
+          <div class="flex gap-2 mt-3">
+            <button id="btn-pausar-trib" class="btn-primary btn-warn btn-sm flex-1">⏸ Pausar</button>
+            <button id="btn-retomar-trib" class="btn-primary btn-success btn-sm flex-1 hidden">▶ Retomar</button>
+            <button id="btn-encerrar-trib" class="btn-primary btn-danger btn-sm flex-1">⏹ Encerrar</button>
+          </div>
+        </div>
+
+        <div id="form-tribuna" class="space-y-3">
+          <div>
+            <label>Vereador</label>
+            <select id="sel-tribuna-vereador">
+              <option value="">— Selecione —</option>
+            </select>
+          </div>
+          <div>
+            <label>Tempo (minutos)</label>
+            <input id="inp-tribuna-tempo" type="number" value="5" min="1" max="30" step="1">
+          </div>
+          <button id="btn-iniciar-trib" class="btn-primary w-full">
+            🎤 Iniciar Tribuna
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Card: Adicionar Item ───────────────────────────── -->
+      <div class="card">
+        <div class="card-title">➕ Adicionar Item à Pauta</div>
+        <div class="space-y-3">
+          <div>
+            <label>Proposição</label>
+            <select id="sel-proposicao">
+              <option value="">— Selecione —</option>
+            </select>
+          </div>
+          <div>
+            <label>Tipo de Votação</label>
+            <select id="sel-tipo-votacao">
+              <option value="nominal">Nominal</option>
+              <option value="simbolica">Simbólica</option>
+              <option value="secreta">Secreta</option>
+            </select>
+          </div>
+          <button id="btn-add-item" class="btn-primary w-full">Adicionar à Ordem do Dia</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Card: Ordem do Dia ─────────────────────────────── -->
+    <div class="card">
+      <div class="card-title">📄 Ordem do Dia
+        <span id="sessao-badge-od" class="text-slate-500 text-xs normal-case font-normal"></span>
+      </div>
+      <div id="lista-od" class="space-y-2">
+        <p class="text-slate-500 text-sm text-center py-8">Inicie uma sessão para ver a ordem do dia.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast">
+  <p id="toast-msg" class="text-sm font-semibold"></p>
+</div>
+
+<script>
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s ?? '';
+  return d.innerHTML;
+}
+
+const BASE = '../..';
+let sessaoAtual = null;
+let tribunaAtual = null;
+let tribunaSSE = null;
+let pollingInterval = null;
+
+// ── Toast ─────────────────────────────────────────────────
+function toast(msg, tipo = 'success') {
+  const el = document.getElementById('toast');
+  const msgEl = document.getElementById('toast-msg');
+  el.className = `toast show ${tipo}`;
+  msgEl.textContent = msg;
+  msgEl.style.color = tipo === 'error' ? '#f87171' : '#4ade80';
+  setTimeout(() => { el.className = 'toast'; }, 3500);
+}
+
+// ── API Helper ────────────────────────────────────────────
+async function api(endpoint, action, body = null) {
+  const url = `${BASE}/api/${endpoint}?action=${action}`;
+  const opts = body ? {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  } : { method: 'GET' };
+
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+// ── Login ─────────────────────────────────────────────────
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const login = document.getElementById('inp-login').value.trim();
+  const senha = document.getElementById('inp-senha').value;
+  const errEl = document.getElementById('login-erro');
+  errEl.classList.add('hidden');
+
+  const json = await api('auth.php', 'login_admin', { login, senha });
+  if (!json.success) {
+    errEl.textContent = json.error;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('hdr-usuario').textContent =
+    `${json.data.nome} (${json.data.perfil})`;
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('app').classList.remove('hidden');
+
+  await inicializar();
+});
+
+document.getElementById('inp-senha').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-login').click();
+});
+
+// ── Logout ────────────────────────────────────────────────
+document.getElementById('btn-logout-admin').addEventListener('click', async () => {
+  if (!confirm('Deseja sair do terminal?')) return;
+  await api('auth.php', 'logout');
+  location.reload();
+});
+
+// ── Inicializar ────────────────────────────────────────────
+async function inicializar() {
+  await carregarSessaoAtiva();
+  await carregarProposicoes();
+  await carregarVereadores();
+  iniciarPolling();
+}
+
+async function carregarSessaoAtiva() {
+  const json = await api('sessoes.php', 'ativa');
+  sessaoAtual = json.data;
+
+  const formSessao   = document.getElementById('form-sessao');
+  const infoSessao   = document.getElementById('sessao-ativa-info');
+  const hdrStatus    = document.getElementById('hdr-sessao-status');
+
+  if (sessaoAtual) {
+    formSessao.classList.add('hidden');
+    infoSessao.classList.remove('hidden');
+    document.getElementById('txt-sessao-ativa').textContent =
+      `Sessão ${sessaoAtual.numero} — ${formatarData(sessaoAtual.data)} (${sessaoAtual.tipo})`;
+    hdrStatus.innerHTML = `<span class="badge-andamento status-badge">● Em andamento</span>`;
+    document.getElementById('sessao-badge-od').textContent =
+      `Sessão ${sessaoAtual.numero}`;
+    await carregarOrdemDia();
+    await carregarTribuna();
+  } else {
+    formSessao.classList.remove('hidden');
+    infoSessao.classList.add('hidden');
+    hdrStatus.textContent = 'Sem sessão ativa';
+    document.getElementById('lista-od').innerHTML =
+      '<p class="text-slate-500 text-sm text-center py-8">Inicie uma sessão para ver a ordem do dia.</p>';
+    // Pré-fill data
+    document.getElementById('inp-data-sessao').valueAsDate = new Date();
+  }
+}
+
+// ── Sessão ────────────────────────────────────────────────
+document.getElementById('btn-iniciar-sessao').addEventListener('click', async () => {
+  const numero = document.getElementById('inp-num-sessao').value.trim();
+  const data   = document.getElementById('inp-data-sessao').value;
+  const tipo   = document.getElementById('sel-tipo-sessao').value;
+
+  if (!numero || !data) { toast('Informe número e data da sessão.', 'error'); return; }
+
+  const json = await api('sessoes.php', 'iniciar', { numero, data, tipo });
+  if (!json.success) { toast(json.error, 'error'); return; }
+
+  toast('Sessão iniciada com sucesso!');
+  await carregarSessaoAtiva();
+});
+
+document.getElementById('btn-encerrar-sessao').addEventListener('click', async () => {
+  if (!confirm('Confirma o encerramento da sessão?')) return;
+  const json = await api('sessoes.php', 'encerrar', { sessao_id: sessaoAtual.id });
+  if (!json.success) { toast(json.error, 'error'); return; }
+  toast('Sessão encerrada.');
+  sessaoAtual = null;
+  await carregarSessaoAtiva();
+});
+
+// ── Ordem do Dia ──────────────────────────────────────────
+async function carregarOrdemDia() {
+  if (!sessaoAtual) return;
+  const json = await api('ordem_dia.php', 'listar', null);
+  // GET with query param
+  const r = await fetch(`${BASE}/api/ordem_dia.php?action=listar&sessao_id=${sessaoAtual.id}`);
+  const data = await r.json();
+  renderOrdemDia(data.data || []);
+}
+
+function renderOrdemDia(items) {
+  const lista = document.getElementById('lista-od');
+  if (!items.length) {
+    lista.innerHTML = '<p class="text-slate-500 text-sm text-center py-6">Nenhum item na pauta. Adicione proposições acima.</p>';
+    return;
+  }
+
+  lista.innerHTML = items.map(item => {
+    const badgeMap = {
+      pendente:      ['badge-pendente','Pendente'],
+      em_discussao:  ['badge-discussao','Discussão'],
+      votando:       ['badge-votando','VOTANDO'],
+      encerrada:     ['badge-encerrada','Encerrada'],
+    };
+    const [badgeCls, badgeTxt] = badgeMap[item.status_votacao] || ['badge-pendente','Pendente'];
+
+    let resultadoBadge = '';
+    if (item.resultado === 'aprovado')  resultadoBadge = '<span class="text-green-400 text-xs font-bold ml-2">✓ Aprovado</span>';
+    if (item.resultado === 'rejeitado') resultadoBadge = '<span class="text-red-400 text-xs font-bold ml-2">✗ Rejeitado</span>';
+    if (item.resultado === 'empate')    resultadoBadge = '<span class="text-blue-400 text-xs font-bold ml-2">≈ Empate</span>';
+
+    let botoes = '';
+    if (item.status_votacao === 'pendente') {
+      botoes = `
+        <button onclick="iniciarDiscussao(${item.id})" class="btn-primary btn-sm" style="background:#7c3aed">💬 Discutir</button>
+        <button onclick="abrirVotacao(${item.id})" class="btn-primary btn-sm btn-warn">🗳️ Abrir Votação</button>
+      `;
+    } else if (item.status_votacao === 'em_discussao') {
+      botoes = `
+        <button onclick="abrirVotacao(${item.id})" class="btn-primary btn-sm btn-warn">🗳️ Abrir Votação</button>
+      `;
+    } else if (item.status_votacao === 'votando') {
+      botoes = `
+        <button onclick="encerrarVotacao(${item.id})" class="btn-primary btn-sm btn-danger">⏹ Encerrar Votação</button>
+      `;
+    }
+
+    return `
+      <div class="item-od ${item.status_votacao === 'votando' ? 'ativo' : ''}">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-slate-500 text-xs font-mono">${item.ordem_exibicao}.</span>
+            <span class="status-badge ${badgeCls}">${badgeTxt}</span>
+            ${resultadoBadge}
+            ${item.votos_sim ? `<span class="text-slate-400 text-xs">(${item.votos_sim}S ${item.votos_nao}N ${item.votos_abstencao}A)</span>` : ''}
+          </div>
+          <div class="flex gap-2 flex-wrap">${botoes}</div>
+        </div>
+        <div class="mt-2">
+          <p class="text-white text-sm font-semibold">${escHtml(item.tipo)} nº ${escHtml(item.numero)}/${escHtml(item.ano)}</p>
+          <p class="text-slate-400 text-xs mt-1 leading-relaxed">${escHtml(item.ementa)}</p>
+          ${item.autor ? `<p class="text-slate-500 text-xs mt-1">Autoria: ${escHtml(item.autor)}</p>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function iniciarDiscussao(id) {
+  const json = await fetch(`${BASE}/api/ordem_dia.php?action=iniciar_discussao`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  }).then(r => r.json());
+  if (!json.success) { toast(json.error, 'error'); return; }
+  toast('Discussão iniciada.');
+  await carregarOrdemDia();
+}
+
+async function abrirVotacao(id) {
+  if (!confirm('Confirma a abertura da votação?')) return;
+  const json = await fetch(`${BASE}/api/ordem_dia.php?action=abrir_votacao`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  }).then(r => r.json());
+  if (!json.success) { toast(json.error, 'error'); return; }
+  toast('🗳️ Votação aberta!');
+  await carregarOrdemDia();
+}
+
+async function encerrarVotacao(id) {
+  if (!confirm('Confirma o encerramento da votação?')) return;
+  const json = await fetch(`${BASE}/api/ordem_dia.php?action=encerrar_votacao`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  }).then(r => r.json());
+  if (!json.success) { toast(json.error, 'error'); return; }
+  const res = json.data;
+  const label = { aprovado: '✓ APROVADO', rejeitado: '✗ REJEITADO', empate: '≈ EMPATE', nao_votado: 'Sem votos' };
+  toast(`Votação encerrada. Resultado: ${label[res.resultado] || res.resultado}`);
+  await carregarOrdemDia();
+}
+
+// ── Adicionar item ────────────────────────────────────────
+async function carregarProposicoes() {
+  const r = await fetch(`${BASE}/api/ordem_dia.php?action=listar_proposicoes`);
+  const json = await r.json();
+  const sel = document.getElementById('sel-proposicao');
+  sel.innerHTML = '<option value="">— Selecione —</option>';
+  (json.data || []).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.tipo} nº ${p.numero}/${p.ano} – ${p.ementa.substring(0, 60)}...`;
+    sel.appendChild(opt);
+  });
+}
+
+document.getElementById('btn-add-item').addEventListener('click', async () => {
+  if (!sessaoAtual) { toast('Inicie uma sessão primeiro.', 'error'); return; }
+  const propId = document.getElementById('sel-proposicao').value;
+  const tipoVot = document.getElementById('sel-tipo-votacao').value;
+  if (!propId) { toast('Selecione uma proposição.', 'error'); return; }
+
+  const json = await fetch(`${BASE}/api/ordem_dia.php?action=adicionar`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessao_id: sessaoAtual.id, proposicao_id: Number(propId), tipo_votacao: tipoVot }),
+  }).then(r => r.json());
+
+  if (!json.success) { toast(json.error, 'error'); return; }
+  toast('Item adicionado à pauta.');
+  await carregarOrdemDia();
+});
+
+// ── Tribuna ────────────────────────────────────────────────
+async function carregarVereadores() {
+  const r = await fetch(`${BASE}/api/tribuna.php?action=lista_vereadores`);
+  const json = await r.json();
+  const sel = document.getElementById('sel-tribuna-vereador');
+  sel.innerHTML = '<option value="">— Selecione —</option>';
+  (json.data || []).forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = `${v.nome} (${v.partido})`;
+    sel.appendChild(opt);
+  });
+}
+
+async function carregarTribuna() {
+  if (!sessaoAtual) return;
+  const r = await fetch(`${BASE}/api/tribuna.php?action=status`);
+  const json = await r.json();
+  tribunaAtual = json.data;
+  renderTribunaControle(tribunaAtual);
+}
+
+function renderTribunaControle(tribuna) {
+  const infoEl  = document.getElementById('tribuna-ativa-info');
+  const formEl  = document.getElementById('form-tribuna');
+
+  if (!tribuna || ['encerrado', null].includes(tribuna?.status)) {
+    infoEl.classList.add('hidden');
+    formEl.classList.remove('hidden');
+    return;
+  }
+
+  infoEl.classList.remove('hidden');
+  formEl.classList.add('hidden');
+
+  document.getElementById('txt-tribuna-ativa').textContent =
+    `${tribuna.nome} (${tribuna.partido})`;
+
+  const seg = tribuna.tempo_calculado ?? tribuna.tempo_restante ?? 0;
+  const m   = String(Math.floor(seg / 60)).padStart(2, '0');
+  const s   = String(seg % 60).padStart(2, '0');
+  document.getElementById('txt-tribuna-timer').textContent = `${m}:${s}`;
+
+  const btnPausar  = document.getElementById('btn-pausar-trib');
+  const btnRetomar = document.getElementById('btn-retomar-trib');
+  if (tribuna.status === 'falando') {
+    btnPausar.classList.remove('hidden');
+    btnRetomar.classList.add('hidden');
+  } else if (tribuna.status === 'pausado') {
+    btnPausar.classList.add('hidden');
+    btnRetomar.classList.remove('hidden');
+  }
+}
+
+document.getElementById('btn-iniciar-trib').addEventListener('click', async () => {
+  if (!sessaoAtual) { toast('Inicie uma sessão primeiro.', 'error'); return; }
+  const vid    = document.getElementById('sel-tribuna-vereador').value;
+  const minutos = parseInt(document.getElementById('inp-tribuna-tempo').value) || 5;
+  if (!vid) { toast('Selecione um vereador.', 'error'); return; }
+
+  const json = await fetch(`${BASE}/api/tribuna.php?action=iniciar`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessao_id: sessaoAtual.id, vereador_id: Number(vid), tempo_segundos: minutos * 60 }),
+  }).then(r => r.json());
+
+  if (!json.success) { toast(json.error, 'error'); return; }
+  toast('🎤 Tribuna iniciada!');
+  await carregarTribuna();
+});
+
+document.getElementById('btn-pausar-trib').addEventListener('click', async () => {
+  if (!tribunaAtual) return;
+  const json = await fetch(`${BASE}/api/tribuna.php?action=pausar`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: tribunaAtual.id }),
+  }).then(r => r.json());
+  if (!json.success) { toast(json.error, 'error'); return; }
+  toast('⏸ Tribuna pausada.');
+  await carregarTribuna();
+});
+
+document.getElementById('btn-retomar-trib').addEventListener('click', async () => {
+  if (!tribunaAtual) return;
+  const json = await fetch(`${BASE}/api/tribuna.php?action=retomar`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: tribunaAtual.id }),
+  }).then(r => r.json());
+  if (!json.success) { toast(json.error, 'error'); return; }
+  toast('▶ Tribuna retomada.');
+  await carregarTribuna();
+});
+
+document.getElementById('btn-encerrar-trib').addEventListener('click', async () => {
+  if (!tribunaAtual) return;
+  if (!confirm('Encerrar tribuna?')) return;
+  const json = await fetch(`${BASE}/api/tribuna.php?action=encerrar`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: tribunaAtual.id }),
+  }).then(r => r.json());
+  if (!json.success) { toast(json.error, 'error'); return; }
+  toast('⏹ Tribuna encerrada.');
+  tribunaAtual = null;
+  await carregarTribuna();
+});
+
+// ── Polling para atualização automática ───────────────────
+function iniciarPolling() {
+  pollingInterval = setInterval(async () => {
+    await carregarOrdemDia();
+    await carregarTribuna();
+  }, 2000);
+}
+
+// ── Utilitários ───────────────────────────────────────────
+function formatarData(d) {
+  if (!d) return '';
+  const [ano, mes, dia] = d.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+</script>
+</body>
+</html>

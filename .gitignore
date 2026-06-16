@@ -1,0 +1,46 @@
+# ── Credenciais e config sensível ─────────────────────────
+config/database.php
+config/database.prod.php
+.env
+.env.local
+
+# ── Setup (executar uma vez, depois deletar) ───────────────
+setup.php
+
+# ── Ferramentas de diagnóstico/debug ──────────────────────
+fix_*.php
+diag_*.php
+chk*.php
+verify_*.php
+
+# ── Logs ──────────────────────────────────────────────────
+*.log
+*.bak
+logs/
+
+# ── Dependências ──────────────────────────────────────────
+vendor/
+
+# ── Fotos reais dos vereadores (não commitar no git público)
+public/assets/img/vereadores/*.jpg
+public/assets/img/vereadores/*.jpeg
+public/assets/img/vereadores/*.png
+public/assets/img/vereadores/*.webp
+
+# ── Claude Code (configurações locais da IDE) ─────────────
+.claude/
+
+# ── Scripts de desenvolvimento Windows ────────────────────
+start.bat
+*.bat
+
+# ── Docs internos ─────────────────────────────────────────
+docs/superpowers/
+
+# ── OS / Editor ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/

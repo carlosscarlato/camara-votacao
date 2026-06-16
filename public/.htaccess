@@ -1,0 +1,56 @@
+Options -Indexes
+
+# ── HTTPS redirect (ativar após instalar SSL) ──────────────
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP_HOST} !^localhost [NC]
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# ── Headers de segurança ───────────────────────────────────
+<IfModule mod_headers.c>
+    # Impede MIME sniffing
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Referrer
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # XSS (legado, para navegadores antigos)
+    Header always set X-XSS-Protection "1; mode=block"
+
+    # HSTS — força HTTPS por 1 ano (ativar junto com SSL)
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    # Content Security Policy
+    # Permite: scripts/estilos próprios + CDNs utilizados
+    Header always set Content-Security-Policy "\
+        default-src 'self'; \
+        script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; \
+        style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; \
+        img-src 'self' data:; \
+        connect-src 'self'; \
+        font-src 'self'; \
+        object-src 'none'; \
+        base-uri 'self'; \
+        form-action 'self'"
+
+    # Remove header que expõe versão do servidor
+    Header always unset X-Powered-By
+    Header always unset Server
+</IfModule>
+
+# ── Cache para assets estáticos ────────────────────────────
+<FilesMatch "\.(svg|png|jpg|jpeg|webp|css|js|woff2?)$">
+    <IfModule mod_expires.c>
+        ExpiresActive On
+        ExpiresDefault "access plus 1 month"
+    </IfModule>
+</FilesMatch>
+
+# ── Bloqueia acesso direto a arquivos sensíveis ────────────
+<FilesMatch "\.(sql|log|bak|sh|env|example\.php)$">
+    Order deny,allow
+    Deny from all
+</FilesMatch>

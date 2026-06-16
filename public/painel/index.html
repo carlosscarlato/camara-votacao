@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel do Plenário</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    background: #060d1c;
+    color: #f1f5f9;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Cabeçalho dourado */
+  .hdr-gold { background: linear-gradient(135deg, #1a1012, #2d1b00, #1a1012); border-bottom: 2px solid #b45309; }
+
+  /* Cards de vereadores */
+  .vereador-card {
+    border: 2px solid #1e3a5f;
+    background: #0d1f3a;
+    border-radius: 12px;
+    transition: all .3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .vereador-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity .4s;
+  }
+  .vereador-card.voto-sim    { border-color: #16a34a; background: #0a2e1a; box-shadow: 0 0 20px #16a34a44; }
+  .vereador-card.voto-nao    { border-color: #dc2626; background: #2d0a0a; box-shadow: 0 0 20px #dc262644; }
+  .vereador-card.voto-abst   { border-color: #b45309; background: #2d1b00; box-shadow: 0 0 20px #b4530944; }
+  .vereador-card.voto-ausente { border-color: #374151; background: #111827; opacity: .7; }
+
+  .voto-icon {
+    font-size: 1.8rem;
+    font-weight: 900;
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    text-shadow: 0 2px 8px rgba(0,0,0,.8);
+  }
+  .voto-sim    .voto-icon { color: #4ade80; }
+  .voto-nao    .voto-icon { color: #f87171; }
+  .voto-abst   .voto-icon { color: #fbbf24; }
+  .voto-ausente .voto-icon { color: #6b7280; }
+
+  /* Placar */
+  .placar-sim  { background: #14532d; border: 2px solid #16a34a; }
+  .placar-nao  { background: #7f1d1d; border: 2px solid #dc2626; }
+  .placar-abst { background: #451a03; border: 2px solid #b45309; }
+  .placar-pend { background: #1e3a5f; border: 2px solid #3b82f6; }
+
+  /* Cronômetro */
+  .timer-digits {
+    font-size: 9vw;
+    font-weight: 900;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 4px;
+    text-shadow: 0 0 40px currentColor;
+    line-height: 1;
+  }
+  .timer-urgente { color: #f87171; animation: pulse-red 1s infinite; }
+  @keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  /* Resultado */
+  .resultado-aprovado  { background: linear-gradient(135deg, #14532d, #166534); border: 2px solid #4ade80; }
+  .resultado-rejeitado { background: linear-gradient(135deg, #7f1d1d, #991b1b); border: 2px solid #f87171; }
+  .resultado-empate    { background: linear-gradient(135deg, #1e3a5f, #1d4ed8); border: 2px solid #93c5fd; }
+
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .fade-in { animation: fadeIn .4s ease forwards; }
+
+  @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+  .slide-up { animation: slideUp .5s cubic-bezier(.22,.61,.36,1) forwards; }
+
+  #painel-tribuna { transform: translateY(100%); }
+  #painel-tribuna.visivel { animation: slideUp .5s cubic-bezier(.22,.61,.36,1) forwards; }
+</style>
+</head>
+<body class="flex flex-col h-screen">
+
+<!-- ── CABEÇALHO ─────────────────────────────────────────── -->
+<header class="hdr-gold px-6 py-3 flex items-center justify-between flex-shrink-0">
+  <div>
+    <h1 class="text-amber-300 font-extrabold text-2xl tracking-wide uppercase">🏛️ Câmara Municipal</h1>
+    <p id="hdr-sessao" class="text-amber-500 text-sm font-semibold">Aguardando sessão...</p>
+  </div>
+  <div class="text-right">
+    <p id="hdr-data" class="text-amber-400 text-sm"></p>
+    <div id="hdr-conexao" class="text-xs text-green-400 font-semibold mt-1">● AO VIVO</div>
+  </div>
+</header>
+
+<!-- ── CORPO PRINCIPAL ───────────────────────────────────── -->
+<main id="painel-principal" class="flex-1 overflow-hidden flex flex-col">
+
+  <!-- Banner de votação ativa -->
+  <div id="banner-votacao" class="hidden flex-shrink-0 px-4 pt-3">
+    <div class="rounded-xl px-5 py-4 border-2 border-amber-400" style="background:linear-gradient(135deg,#78350f,#92400e)">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-amber-400 text-slate-900 font-black text-sm uppercase tracking-widest px-3 py-1 rounded-lg flex-shrink-0">🗳️ EM VOTAÇÃO</span>
+        <span id="banner-tipo" class="text-amber-300 font-black text-2xl tracking-wide"></span>
+      </div>
+      <p id="banner-ementa" class="text-white font-semibold text-lg leading-snug" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden"></p>
+    </div>
+  </div>
+
+  <!-- Banner de discussão ativa -->
+  <div id="banner-discussao" class="hidden flex-shrink-0 px-4 pt-3">
+    <div class="rounded-xl px-5 py-4 border-2 border-indigo-400" style="background:linear-gradient(135deg,#1e1b4b,#312e81)">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-indigo-400 text-slate-900 font-black text-sm uppercase tracking-widest px-3 py-1 rounded-lg flex-shrink-0">💬 EM DISCUSSÃO</span>
+        <span id="banner-disc-tipo" class="text-indigo-300 font-black text-2xl tracking-wide"></span>
+      </div>
+      <p id="banner-disc-ementa" class="text-white font-semibold text-lg leading-snug" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden"></p>
+    </div>
+  </div>
+
+  <!-- Placar -->
+  <div id="div-placar" class="hidden flex-shrink-0 px-4 pt-2">
+    <div class="grid grid-cols-4 gap-3">
+      <div class="placar-sim rounded-xl text-center py-3 px-2">
+        <div class="text-green-400 text-3xl font-black" id="pl-sim">0</div>
+        <div class="text-green-600 text-xs font-bold uppercase">SIM</div>
+      </div>
+      <div class="placar-nao rounded-xl text-center py-3 px-2">
+        <div class="text-red-400 text-3xl font-black" id="pl-nao">0</div>
+        <div class="text-red-600 text-xs font-bold uppercase">NÃO</div>
+      </div>
+      <div class="placar-abst rounded-xl text-center py-3 px-2">
+        <div class="text-amber-400 text-3xl font-black" id="pl-abst">0</div>
+        <div class="text-amber-600 text-xs font-bold uppercase">ABST.</div>
+      </div>
+      <div class="placar-pend rounded-xl text-center py-3 px-2">
+        <div class="text-blue-400 text-3xl font-black" id="pl-pend">0</div>
+        <div class="text-blue-600 text-xs font-bold uppercase">Aguard.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid de vereadores -->
+  <div id="grid-vereadores" class="flex-1 overflow-auto px-4 py-2">
+    <p class="text-slate-600 text-center text-lg py-16">Aguardando início da sessão...</p>
+  </div>
+
+  <!-- Banner resultado final -->
+  <div id="banner-resultado" class="hidden flex-shrink-0 px-4 pb-3">
+    <div id="resultado-card" class="rounded-xl p-4 flex items-center justify-between">
+      <div>
+        <p class="text-white font-black text-2xl uppercase tracking-wider" id="txt-resultado">APROVADO</p>
+        <p id="txt-resultado-placar" class="text-white/80 text-sm font-semibold"></p>
+      </div>
+      <div class="text-6xl font-black" id="ico-resultado">✓</div>
+    </div>
+  </div>
+</main>
+
+<!-- ── PAINEL TRIBUNA (sobrepõe o plenário) ──────────────── -->
+<div id="painel-tribuna" class="hidden fixed bottom-0 left-0 right-0 z-20 bg-slate-950 border-t-4 border-amber-500">
+  <div class="flex items-center gap-6 px-8 py-4">
+
+    <!-- Foto -->
+    <img id="trib-foto" src="" alt=""
+      class="w-24 h-24 rounded-full object-cover border-4 border-amber-400 flex-shrink-0 shadow-2xl">
+
+    <!-- Info -->
+    <div class="flex-1">
+      <p class="text-amber-400 text-xs font-bold uppercase tracking-widest">Na Tribuna</p>
+      <p id="trib-nome" class="text-white text-3xl font-extrabold leading-tight"></p>
+      <p id="trib-partido" class="text-amber-300 text-lg font-semibold"></p>
+    </div>
+
+    <!-- Cronômetro -->
+    <div class="text-right flex-shrink-0">
+      <p class="text-slate-400 text-xs uppercase tracking-wider mb-1">Tempo Restante</p>
+      <div id="timer-display" class="timer-digits text-amber-300">05:00</div>
+      <p id="timer-status" class="text-slate-500 text-xs uppercase mt-1 tracking-wider">Falando</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s ?? '';
+  return d.innerHTML;
+}
+
+const BASE = '../..';
+let vereadores = [];
+let estadoPainel = null;
+let timerInterval = null;
+let timerSegundos = 0;
+let timerAtivo = false;
+let gridSemVotacaoCache = null; // evita re-fetch desnecessário
+
+// ── SSE: Painel ───────────────────────────────────────────
+function conectarSSEPainel() {
+  const src = new EventSource(`${BASE}/sse/painel.php`);
+
+  src.addEventListener('painel_update', e => {
+    const data = JSON.parse(e.data);
+    estadoPainel = data;
+    renderPainel(data);
+  });
+
+  src.onerror = () => {
+    document.getElementById('hdr-conexao').innerHTML = '<span class="text-red-400">● RECONECTANDO</span>';
+    src.close();
+    setTimeout(conectarSSEPainel, 3000);
+  };
+}
+
+// ── SSE: Cronômetro ───────────────────────────────────────
+function conectarSSECronometro() {
+  const src = new EventSource(`${BASE}/sse/cronometro.php`);
+
+  src.addEventListener('cronometro_update', e => {
+    const data = JSON.parse(e.data);
+    renderTribuna(data);
+  });
+
+  src.onerror = () => {
+    src.close();
+    setTimeout(conectarSSECronometro, 3000);
+  };
+}
+
+// ── Render principal ──────────────────────────────────────
+function renderPainel(data) {
+  document.getElementById('hdr-conexao').innerHTML = '<span class="text-green-400">● AO VIVO</span>';
+
+  // Data atual
+  document.getElementById('hdr-data').textContent = new Date().toLocaleDateString('pt-BR', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
+  });
+
+  // Sessão
+  if (data.sessao) {
+    document.getElementById('hdr-sessao').textContent =
+      `${data.sessao.tipo.charAt(0).toUpperCase() + data.sessao.tipo.slice(1)} nº ${data.sessao.numero}`;
+  }
+
+  const votacao = data.votacao;
+  const semVotacao = !votacao?.ativa;
+
+  // Banner de votação
+  const bannerEl = document.getElementById('banner-votacao');
+  if (!semVotacao) {
+    bannerEl.classList.remove('hidden');
+    document.getElementById('banner-tipo').textContent    = `${votacao.item?.tipo} nº ${votacao.item?.numero}/${votacao.item?.ano}`;
+    document.getElementById('banner-ementa').textContent  = votacao.item?.ementa || '';
+  } else {
+    bannerEl.classList.add('hidden');
+  }
+
+  // Banner de discussão
+  const discussao = data.discussao;
+  const bannerDisc = document.getElementById('banner-discussao');
+  if (discussao?.ativa && semVotacao) {
+    bannerDisc.classList.remove('hidden');
+    document.getElementById('banner-disc-tipo').textContent   = `${discussao.item?.tipo} nº ${discussao.item?.numero}/${discussao.item?.ano}`;
+    document.getElementById('banner-disc-ementa').textContent = discussao.item?.ementa || '';
+  } else {
+    bannerDisc.classList.add('hidden');
+  }
+
+  // Placar
+  const placarEl = document.getElementById('div-placar');
+  if (!semVotacao) {
+    placarEl.classList.remove('hidden');
+    document.getElementById('pl-sim').textContent  = votacao.placar.sim;
+    document.getElementById('pl-nao').textContent  = votacao.placar.nao;
+    document.getElementById('pl-abst').textContent = votacao.placar.abstencao;
+    document.getElementById('pl-pend').textContent = votacao.placar.pendente;
+  } else {
+    placarEl.classList.add('hidden');
+  }
+
+  // Resultado
+  renderResultadoBanner(votacao);
+
+  // Grid de vereadores
+  if (votacao?.votos?.length) {
+    gridSemVotacaoCache = null; // votação ativa: limpa cache para reuso posterior
+    renderGridVereadores(votacao.votos);
+  } else if (data.sessao) {
+    renderGridVereadoressemVotos(data.sessao);
+  }
+}
+
+function renderGridVereadores(votos) {
+  const grid = document.getElementById('grid-vereadores');
+  const colunas = votos.length <= 9 ? 'grid-cols-3' : votos.length <= 12 ? 'grid-cols-4' : 'grid-cols-5';
+
+  grid.innerHTML = `<div class="grid ${colunas} gap-2 h-full">` +
+    votos.map(v => {
+      const cls = v.voto === 'SIM' ? 'voto-sim'
+                : v.voto === 'NAO' ? 'voto-nao'
+                : v.voto === 'ABSTENCAO' ? 'voto-abst'
+                : v.voto === 'AUSENTE' ? 'voto-ausente'
+                : '';
+      const icon = v.voto === 'SIM' ? '✔'
+                 : v.voto === 'NAO' ? '✘'
+                 : v.voto === 'ABSTENCAO' ? '≈'
+                 : v.voto === 'AUSENTE' ? '—'
+                 : '';
+
+      return `
+        <div class="vereador-card ${cls} fade-in p-2 flex flex-col items-center text-center">
+          ${icon ? `<span class="voto-icon">${icon}</span>` : ''}
+          <img src="${BASE}/public/${v.foto || 'assets/img/default-avatar.svg'}" alt="${escHtml(v.nome)}"
+            class="w-14 h-14 rounded-full object-cover border-2 border-slate-600 mb-1"
+            onerror="this.src='${BASE}/public/assets/img/default-avatar.svg'">
+          <p class="text-white text-xs font-bold leading-tight">${escHtml(v.nome)}</p>
+          <p class="text-slate-400 text-xs">${escHtml(v.partido)}</p>
+        </div>
+      `;
+    }).join('') + '</div>';
+}
+
+function renderGridVereadoressemVotos(sessao) {
+  if (gridSemVotacaoCache) return; // já renderizado, evita piscar
+
+  fetch(`${BASE}/api/auth.php?action=lista_vereadores`)
+    .then(r => r.json())
+    .then(json => {
+      const lista = json.data || [];
+      const grid  = document.getElementById('grid-vereadores');
+      if (!lista.length) {
+        grid.innerHTML = '<p class="text-slate-600 text-center text-lg py-16">Aguardando início da sessão...</p>';
+        return;
+      }
+      const colunas = lista.length <= 9 ? 'grid-cols-3' : 'grid-cols-4';
+      const html = `<div class="grid ${colunas} gap-2">` +
+        lista.map(v => {
+          const foto = v.foto ? `${BASE}/public/${v.foto}` : `${BASE}/public/assets/img/default-avatar.svg`;
+          return `
+            <div class="vereador-card p-2 flex flex-col items-center text-center">
+              <img src="${foto}" alt="${escHtml(v.nome)}"
+                class="w-14 h-14 rounded-full object-cover border-2 border-slate-700 mb-1"
+                onerror="this.src='${BASE}/public/assets/img/default-avatar.svg'">
+              <p class="text-white text-xs font-bold leading-tight">${escHtml(v.nome)}</p>
+              <p class="text-slate-500 text-xs">${escHtml(v.partido)}</p>
+            </div>`;
+        }).join('') + '</div>';
+      grid.innerHTML = html;
+      gridSemVotacaoCache = html;
+    });
+}
+
+function renderResultadoBanner(votacao) {
+  const bannerRes = document.getElementById('banner-resultado');
+  if (!votacao?.ativa && estadoPainel?.sessao) {
+    // Buscar último resultado? Por ora apenas ocultar
+    bannerRes.classList.add('hidden');
+  } else {
+    bannerRes.classList.add('hidden');
+  }
+}
+
+// ── Tribuna ────────────────────────────────────────────────
+function renderTribuna(data) {
+  const painel = document.getElementById('painel-tribuna');
+
+  if (!data.ativa || data.status === 'encerrado') {
+    painel.classList.add('hidden');
+    painel.classList.remove('visivel');
+    return;
+  }
+
+  painel.classList.remove('hidden');
+  painel.classList.add('visivel');
+
+  document.getElementById('trib-nome').textContent    = data.nome || '';
+  document.getElementById('trib-partido').textContent = data.partido || '';
+
+  const fotoEl = document.getElementById('trib-foto');
+  fotoEl.src   = data.foto ? `${BASE}/public/${data.foto}` : `${BASE}/public/assets/img/default-avatar.svg`;
+  fotoEl.onerror = () => { fotoEl.src = `${BASE}/public/assets/img/default-avatar.svg`; };
+
+  const seg    = data.tempo_calculado ?? 0;
+  const minutos  = String(Math.floor(seg / 60)).padStart(2, '0');
+  const segundos = String(seg % 60).padStart(2, '0');
+  const timerEl  = document.getElementById('timer-display');
+  timerEl.textContent = `${minutos}:${segundos}`;
+  timerEl.className   = 'timer-digits ' + (seg <= 30 ? 'timer-urgente' : 'text-amber-300');
+
+  const statusLabels = {
+    falando: 'Falando',
+    pausado: 'PAUSADO',
+    aguardando: 'Aguardando',
+    encerrado: 'Encerrado',
+  };
+  document.getElementById('timer-status').textContent = statusLabels[data.status] || data.status;
+}
+
+// ── Init ──────────────────────────────────────────────────
+conectarSSEPainel();
+conectarSSECronometro();
+
+// Atualiza hora no cabeçalho a cada segundo
+setInterval(() => {
+  document.getElementById('hdr-data').textContent = new Date().toLocaleDateString('pt-BR', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
+  });
+}, 1000);
+</script>
+</body>
+</html>

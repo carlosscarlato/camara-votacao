@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Votação – Vereador</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0f172a; color: #f1f5f9; font-family: 'Segoe UI', sans-serif; }
+  .btn-sim    { background: #16a34a; }
+  .btn-nao    { background: #dc2626; }
+  .btn-abster { background: #ca8a04; }
+  .btn-sim:active, .btn-nao:active, .btn-abster:active { opacity: .75; transform: scale(.97); }
+  .voted-SIM        { border-color: #16a34a !important; background: #14532d33; }
+  .voted-NAO        { border-color: #dc2626 !important; background: #7f1d1d33; }
+  .voted-ABSTENCAO  { border-color: #ca8a04 !important; background: #78350f33; }
+  .status-badge { font-size: .65rem; padding: 2px 8px; border-radius: 999px; font-weight: 700; text-transform: uppercase; }
+  .status-votando    { background: #fbbf24; color: #1c1917; animation: pulse 1s infinite; }
+  .status-encerrada  { background: #475569; color: #f1f5f9; }
+  .status-discussao  { background: #3b82f6; color: #fff; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+  #overlay { backdrop-filter: blur(4px); }
+
+  /* ── Tribuna ────────────────────────────── */
+  @keyframes pulse-amber { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.2)} }
+  @keyframes slideUpTrib { from{transform:translateY(100%)} to{transform:translateY(0)} }
+  #painel-tribuna-ver { animation: slideUpTrib .4s cubic-bezier(.22,.61,.36,1) forwards; }
+  .timer-tribuna {
+    font-size: 3.5rem; font-weight: 900;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 3px; line-height: 1;
+    text-shadow: 0 0 30px currentColor;
+  }
+  .timer-urgente { color: #f87171; animation: pulse 1s infinite; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ── Login ──────────────────────────────────────────────── -->
+<div id="tela-login" class="flex items-center justify-center min-h-screen p-4">
+  <div class="bg-slate-800 rounded-2xl p-8 w-full max-w-sm shadow-2xl">
+    <div class="text-center mb-8">
+      <div class="text-5xl mb-3">🏛️</div>
+      <h1 class="text-2xl font-bold text-white">Câmara Municipal</h1>
+      <p class="text-slate-400 text-sm mt-1">Sistema de Votação Eletrônica</p>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Selecione seu nome</label>
+        <select id="sel-vereador"
+          class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-white text-base focus:outline-none focus:border-blue-400">
+          <option value="">Carregando...</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">PIN de acesso</label>
+        <input id="inp-pin" type="password" maxlength="6" inputmode="numeric"
+          placeholder="••••••"
+          class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-white text-xl text-center tracking-widest focus:outline-none focus:border-blue-400">
+      </div>
+      <button id="btn-login"
+        class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-lg transition">
+        Entrar
+      </button>
+      <p id="login-erro" class="text-red-400 text-center text-sm hidden"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── App Principal ───────────────────────────────────────── -->
+<div id="tela-app" class="hidden flex flex-col min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+    <div class="flex items-center gap-3">
+      <img id="hdr-foto" src="" alt="" class="w-10 h-10 rounded-full object-cover border-2 border-blue-400">
+      <div>
+        <p id="hdr-nome" class="font-bold text-white text-sm leading-tight"></p>
+        <p id="hdr-partido" class="text-slate-400 text-xs"></p>
+      </div>
+    </div>
+    <div class="text-right">
+      <p id="hdr-sessao" class="text-xs text-slate-400"></p>
+      <div id="hdr-status" class="text-xs text-green-400 font-semibold">● Conectado</div>
+    </div>
+  </header>
+
+  <!-- Corpo -->
+  <main class="flex-1 overflow-auto p-4 space-y-3 pb-24">
+    <h2 class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Ordem do Dia</h2>
+    <div id="lista-ordem-dia" class="space-y-2">
+      <p class="text-slate-500 text-sm text-center py-8">Aguardando sessão...</p>
+    </div>
+  </main>
+
+  <!-- Botão de sair fixo -->
+  <div class="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700 p-3">
+    <button id="btn-logout" class="w-full text-slate-500 text-sm py-2">Sair da sessão</button>
+  </div>
+</div>
+
+<!-- ── Painel Tribuna (aparece quando este vereador está na tribuna) ── -->
+<div id="painel-tribuna-ver" class="hidden fixed inset-0 z-40 flex items-end">
+  <div class="w-full bg-amber-950 border-t-4 border-amber-400 rounded-t-3xl p-6 space-y-4 shadow-2xl">
+
+    <!-- Badge -->
+    <div class="flex items-center justify-center gap-3">
+      <span class="w-3 h-3 bg-amber-400 rounded-full inline-block" style="animation:pulse-amber 1s infinite"></span>
+      <span class="text-amber-300 font-black text-base tracking-widest uppercase">Você está na Tribuna</span>
+    </div>
+
+    <!-- Timer -->
+    <div class="text-center">
+      <div id="ver-trib-timer" class="timer-tribuna text-amber-300">00:00</div>
+      <p id="ver-trib-status" class="text-amber-500 text-xs uppercase font-bold tracking-widest mt-1">Falando</p>
+    </div>
+
+    <!-- Barra de progresso -->
+    <div class="bg-amber-900 rounded-full h-2 overflow-hidden">
+      <div id="ver-trib-progress" class="h-2 bg-amber-400 rounded-full transition-all duration-1000" style="width:100%"></div>
+    </div>
+
+    <p class="text-amber-600 text-xs text-center">Aguarde o encerramento pela Mesa Diretora</p>
+  </div>
+</div>
+
+<!-- ── Banner tribuna de outro vereador (info discreta) ── -->
+<div id="banner-outro-tribuna" class="hidden fixed top-16 left-0 right-0 z-30 px-4">
+  <div class="bg-amber-900/80 border border-amber-700 rounded-xl px-4 py-2 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-amber-400 text-sm">🎤</span>
+      <p id="banner-trib-nome" class="text-amber-200 text-sm font-semibold"></p>
+    </div>
+    <p id="banner-trib-tempo" class="text-amber-300 font-mono text-sm font-bold"></p>
+  </div>
+</div>
+
+<!-- ── Overlay de Votação ──────────────────────────────────── -->
+<div id="overlay-votacao" class="hidden fixed inset-0 z-50 flex items-end" id="overlay">
+  <div class="w-full bg-slate-900 border-t-4 border-yellow-400 rounded-t-3xl p-6 space-y-5 shadow-2xl">
+
+    <!-- Badge pulsante -->
+    <div class="flex items-center justify-center gap-2">
+      <span class="w-3 h-3 bg-yellow-400 rounded-full animate-ping inline-block"></span>
+      <span class="text-yellow-400 font-bold text-sm tracking-widest uppercase">Votação Aberta</span>
+    </div>
+
+    <!-- Proposição -->
+    <div class="bg-slate-800 rounded-xl p-4">
+      <p id="vot-tipo" class="text-xs text-slate-400 font-semibold uppercase"></p>
+      <p id="vot-numero" class="text-white font-bold text-base"></p>
+      <p id="vot-ementa" class="text-slate-300 text-sm mt-2 leading-relaxed line-clamp-4"></p>
+      <button id="btn-ver-mais" class="text-blue-400 text-xs mt-2 underline">Ver ementa completa</button>
+    </div>
+
+    <!-- Já votou? -->
+    <div id="div-ja-votou" class="hidden bg-green-900 border border-green-700 rounded-xl p-4 text-center">
+      <p class="text-green-300 font-bold text-lg">✓ Voto Registrado</p>
+      <p id="txt-voto-registrado" class="text-green-400 text-2xl font-extrabold mt-1"></p>
+    </div>
+
+    <!-- Botões de voto -->
+    <div id="div-botoes-voto" class="grid grid-cols-3 gap-3">
+      <button id="btn-sim"
+        class="btn-sim text-white font-black text-xl py-6 rounded-2xl shadow-lg transition active:scale-95">
+        ✔<br><span class="text-base font-bold">SIM</span>
+      </button>
+      <button id="btn-nao"
+        class="btn-nao text-white font-black text-xl py-6 rounded-2xl shadow-lg transition active:scale-95">
+        ✘<br><span class="text-base font-bold">NÃO</span>
+      </button>
+      <button id="btn-abster"
+        class="btn-abster text-white font-black text-xl py-6 rounded-2xl shadow-lg transition active:scale-95">
+        ≈<br><span class="text-base font-bold">ABSTER</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal ementa completa -->
+<div id="modal-ementa" class="hidden fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4">
+  <div class="bg-slate-800 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-auto space-y-4">
+    <div class="flex justify-between items-start">
+      <h3 class="font-bold text-white text-lg">Detalhes da Proposição</h3>
+      <button id="btn-fechar-modal" class="text-slate-400 text-2xl leading-none">×</button>
+    </div>
+    <div id="modal-conteudo" class="text-slate-300 text-sm space-y-3"></div>
+  </div>
+</div>
+
+<script>
+const BASE = '../..';
+let estado = { vereadorId: null, ordemDiaId: null, votacaoAberta: false, meuVoto: null };
+let evtSource = null;
+
+// ── Carregar vereadores ───────────────────────────────────
+async function carregarVereadores() {
+  const r = await fetch(`${BASE}/api/auth.php?action=lista_vereadores`);
+  const json = await r.json();
+  const sel = document.getElementById('sel-vereador');
+  sel.innerHTML = '<option value="">— Selecione —</option>';
+  (json.data || []).forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = `${v.nome} (${v.partido})`;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Login ─────────────────────────────────────────────────
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const vid = document.getElementById('sel-vereador').value;
+  const pin = document.getElementById('inp-pin').value;
+  const err = document.getElementById('login-erro');
+  err.classList.add('hidden');
+
+  if (!vid || !pin) { err.textContent = 'Selecione seu nome e informe o PIN.'; err.classList.remove('hidden'); return; }
+
+  const r = await fetch(`${BASE}/api/auth.php?action=login_vereador`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ vereador_id: Number(vid), pin }),
+  });
+  const json = await r.json();
+
+  if (!json.success) { err.textContent = json.error; err.classList.remove('hidden'); return; }
+
+  const v = json.data;
+  estado.vereadorId = v.id;
+  document.getElementById('hdr-nome').textContent    = v.nome;
+  document.getElementById('hdr-partido').textContent = v.partido;
+  const fotoEl = document.getElementById('hdr-foto');
+  fotoEl.src = v.foto ? `${BASE}/public/${v.foto}` : `${BASE}/public/assets/img/default-avatar.svg`;
+
+  document.getElementById('tela-login').classList.add('hidden');
+  document.getElementById('tela-app').classList.remove('hidden');
+  document.getElementById('tela-app').classList.add('flex');
+
+  iniciarSSE();
+});
+
+// ── SSE ───────────────────────────────────────────────────
+function iniciarSSE() {
+  evtSource = new EventSource(`${BASE}/sse/vereador.php?vereador_id=${estado.vereadorId}`);
+
+  evtSource.addEventListener('vereador_update', e => {
+    const data = JSON.parse(e.data);
+    renderEstado(data);
+  });
+
+  evtSource.onerror = () => {
+    document.getElementById('hdr-status').innerHTML = '<span class="text-red-400">● Reconectando...</span>';
+    setTimeout(() => {
+      if (evtSource) evtSource.close();
+      iniciarSSE();
+    }, 3000);
+  };
+}
+
+// ── Renderizar estado ─────────────────────────────────────
+function renderEstado(data) {
+  document.getElementById('hdr-status').innerHTML = '<span class="text-green-400">● Conectado</span>';
+
+  // Sessão
+  if (data.sessao) {
+    document.getElementById('hdr-sessao').textContent =
+      `Sessão ${data.sessao.numero} – ${formatarData(data.sessao.data)}`;
+  }
+
+  // Ordem do dia
+  renderOrdemDia(data.ordem_dia || []);
+
+  // Tribuna
+  if (data.tribuna) renderTribuna(data.tribuna);
+
+  // Votação
+  if (data.votacao_aberta && data.item_atual) {
+    estado.ordemDiaId   = data.ordem_dia_id;
+    estado.votacaoAberta = true;
+    estado.meuVoto       = data.meu_voto;
+    verificarVotoPendente(); // reenvio automático se havia voto pendente
+    abrirOverlayVotacao(data.item_atual, data.meu_voto);
+  } else {
+    estado.votacaoAberta = false;
+    document.getElementById('overlay-votacao').classList.add('hidden');
+  }
+}
+
+// ── Renderizar Tribuna ────────────────────────────────────
+function renderTribuna(tribuna) {
+  const painelEu     = document.getElementById('painel-tribuna-ver');
+  const bannerOutro  = document.getElementById('banner-outro-tribuna');
+
+  if (!tribuna?.ativa || tribuna.status === 'encerrado') {
+    painelEu.classList.add('hidden');
+    bannerOutro.classList.add('hidden');
+    return;
+  }
+
+  const seg     = tribuna.tempo_calculado ?? 0;
+  const minutos = String(Math.floor(seg / 60)).padStart(2, '0');
+  const segundos = String(seg % 60).padStart(2, '0');
+  const tempoStr = `${minutos}:${segundos}`;
+  const urgente  = seg <= 30;
+
+  if (tribuna.sou_eu) {
+    // Este vereador está na tribuna — painel grande
+    bannerOutro.classList.add('hidden');
+    painelEu.classList.remove('hidden');
+
+    const timerEl = document.getElementById('ver-trib-timer');
+    timerEl.textContent = tempoStr;
+    timerEl.className   = 'timer-tribuna ' + (urgente ? 'timer-urgente' : 'text-amber-300');
+
+    const statusLabels = { falando:'🎤 Falando', pausado:'⏸ PAUSADO', aguardando:'Aguardando' };
+    document.getElementById('ver-trib-status').textContent = statusLabels[tribuna.status] || tribuna.status;
+
+    // Barra de progresso
+    const pct = tribuna.tempo_inicial > 0 ? (seg / tribuna.tempo_inicial * 100) : 0;
+    document.getElementById('ver-trib-progress').style.width = pct.toFixed(1) + '%';
+    document.getElementById('ver-trib-progress').style.background = urgente ? '#ef4444' : '#fbbf24';
+
+  } else {
+    // Outro vereador está na tribuna — banner discreto
+    painelEu.classList.add('hidden');
+    bannerOutro.classList.remove('hidden');
+    document.getElementById('banner-trib-nome').textContent  = `🎤 ${tribuna.nome} (${tribuna.partido})`;
+    document.getElementById('banner-trib-tempo').textContent = tempoStr;
+  }
+}
+
+function renderOrdemDia(items) {
+  const lista = document.getElementById('lista-ordem-dia');
+  if (!items.length) {
+    lista.innerHTML = '<p class="text-slate-500 text-sm text-center py-8">Nenhum item na pauta.</p>';
+    return;
+  }
+
+  lista.innerHTML = items.map(item => {
+    const labelMap = {
+      pendente: ['Pendente','bg-slate-600'],
+      em_discussao: ['Em Discussão','bg-blue-600'],
+      votando: ['VOTANDO','bg-yellow-500 text-slate-900'],
+      encerrada: ['Encerrada','bg-slate-500'],
+    };
+    const [label, cls] = labelMap[item.status_votacao] || ['Pendente','bg-slate-600'];
+
+    let resultadoBadge = '';
+    if (item.resultado === 'aprovado')  resultadoBadge = '<span class="text-green-400 font-bold text-xs ml-2">✓ Aprovado</span>';
+    if (item.resultado === 'rejeitado') resultadoBadge = '<span class="text-red-400 font-bold text-xs ml-2">✗ Rejeitado</span>';
+
+    return `
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-1">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-slate-400 text-xs font-mono">${item.ordem_exibicao}.</span>
+          <span class="status-badge ${cls} flex-1 text-center">${label}</span>
+          ${resultadoBadge}
+        </div>
+        <p class="text-white font-semibold text-sm">${item.tipo} nº ${item.numero}/${item.ano}</p>
+        <p class="text-slate-400 text-xs leading-relaxed line-clamp-2">${item.ementa}</p>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── Overlay de votação ────────────────────────────────────
+function abrirOverlayVotacao(item, meuVoto) {
+  document.getElementById('vot-tipo').textContent   = item.tipo || '';
+  document.getElementById('vot-numero').textContent = `Nº ${item.numero}/${item.ano}`;
+  document.getElementById('vot-ementa').textContent = item.ementa || '';
+
+  const divJaVotou   = document.getElementById('div-ja-votou');
+  const divBotoes    = document.getElementById('div-botoes-voto');
+
+  if (meuVoto) {
+    divJaVotou.classList.remove('hidden');
+    divBotoes.classList.add('hidden');
+    const labels = { SIM: '✔ SIM', NAO: '✘ NÃO', ABSTENCAO: '≈ ABSTENÇÃO' };
+    document.getElementById('txt-voto-registrado').textContent = labels[meuVoto] || meuVoto;
+  } else {
+    divJaVotou.classList.add('hidden');
+    divBotoes.classList.remove('hidden');
+  }
+
+  document.getElementById('overlay-votacao').classList.remove('hidden');
+}
+
+// ── Botões de voto (com failover SessionStorage + retry) ─────
+async function votar(voto) {
+  if (estado.meuVoto) return;
+
+  const payload = { ordem_dia_id: estado.ordemDiaId, voto };
+
+  // Persiste intenção antes de enviar — garante re-envio em caso de queda de rede
+  sessionStorage.setItem('voto_pendente', JSON.stringify(payload));
+
+  async function tentarEnvio(tentativa = 1) {
+    try {
+      const r    = await fetch(`${BASE}/api/votacao.php?action=votar`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await r.json();
+      if (json.success) {
+        sessionStorage.removeItem('voto_pendente');
+        estado.meuVoto = voto;
+        document.getElementById('div-botoes-voto').classList.add('hidden');
+        document.getElementById('div-ja-votou').classList.remove('hidden');
+        const labels = { SIM: '✔ SIM', NAO: '✘ NÃO', ABSTENCAO: '≈ ABSTENÇÃO' };
+        document.getElementById('txt-voto-registrado').textContent = labels[voto] || voto;
+      } else {
+        sessionStorage.removeItem('voto_pendente');
+        alert(json.error || 'Erro ao registrar voto.');
+      }
+    } catch {
+      if (tentativa <= 3) {
+        // Exibe aviso não-intrusivo e tenta novamente com backoff
+        document.getElementById('hdr-status').innerHTML =
+          `<span class="text-yellow-400">⚠ Reconectando... (tentativa ${tentativa}/3)</span>`;
+        setTimeout(() => tentarEnvio(tentativa + 1), 2000 * tentativa);
+      } else {
+        document.getElementById('hdr-status').innerHTML =
+          '<span class="text-red-400">● Sem conexão</span>';
+        alert('Não foi possível registrar o voto após 3 tentativas.\nSeu voto está salvo localmente — informe a mesa diretora.');
+      }
+    }
+  }
+
+  tentarEnvio();
+}
+
+// Tenta reenviar voto pendente salvo no SessionStorage ao reconectar SSE
+function verificarVotoPendente() {
+  const raw = sessionStorage.getItem('voto_pendente');
+  if (!raw || !estado.ordemDiaId || estado.meuVoto) return;
+  try {
+    const pendente = JSON.parse(raw);
+    if (pendente.ordem_dia_id === estado.ordemDiaId) {
+      console.info('Reenviando voto pendente do SessionStorage…');
+      votar(pendente.voto);
+    }
+  } catch { sessionStorage.removeItem('voto_pendente'); }
+}
+
+document.getElementById('btn-sim').addEventListener('click', () => votar('SIM'));
+document.getElementById('btn-nao').addEventListener('click', () => votar('NAO'));
+document.getElementById('btn-abster').addEventListener('click', () => votar('ABSTENCAO'));
+
+// ── Modal ementa ──────────────────────────────────────────
+document.getElementById('btn-ver-mais').addEventListener('click', () => {
+  document.getElementById('modal-ementa').classList.remove('hidden');
+});
+document.getElementById('btn-fechar-modal').addEventListener('click', () => {
+  document.getElementById('modal-ementa').classList.add('hidden');
+});
+
+// ── Logout ────────────────────────────────────────────────
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  if (!confirm('Deseja realmente sair?')) return;
+  await fetch(`${BASE}/api/auth.php?action=logout`, { method: 'POST' });
+  if (evtSource) evtSource.close();
+  location.reload();
+});
+
+// ── Utilitários ───────────────────────────────────────────
+function formatarData(d) {
+  if (!d) return '';
+  const [ano, mes, dia] = d.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
+// ── Init ──────────────────────────────────────────────────
+carregarVereadores();
+</script>
+</body>
+</html>

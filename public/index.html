@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Votação Eletrônica — Câmara Municipal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; }
+  .hero-bg { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%); }
+  .stat-card { transition: transform .2s; }
+  .stat-card:hover { transform: translateY(-4px); }
+  .feature-card { transition: box-shadow .2s, transform .2s; }
+  .feature-card:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,.12); }
+  @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+  .live-dot { animation: pulse-dot 1.2s infinite; }
+</style>
+</head>
+<body class="bg-gray-50">
+
+<!-- ── HEADER ─────────────────────────────────────────────── -->
+<header class="bg-white shadow-sm sticky top-0 z-50">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">🏛️</span>
+      <div>
+        <p class="font-extrabold text-slate-800 text-lg leading-tight">Câmara Municipal</p>
+        <p class="text-xs text-slate-500 font-medium">Sistema de Votação Eletrônica</p>
+      </div>
+    </div>
+    <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
+      <a href="#funcionalidades" class="hover:text-blue-600 transition">Funcionalidades</a>
+      <a href="sessoes/" class="hover:text-blue-600 transition">Sessões</a>
+      <a href="publico/" class="hover:text-blue-600 transition">Transparência</a>
+      <a href="login/" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">Entrar</a>
+    </nav>
+    <a href="login/" class="md:hidden bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Entrar</a>
+  </div>
+</header>
+
+<!-- ── HERO ───────────────────────────────────────────────── -->
+<section class="hero-bg text-white py-20 px-4">
+  <div class="max-w-4xl mx-auto text-center">
+    <a href="painel/" id="badge-live" class="hidden inline-flex items-center gap-2 bg-green-500/20 border border-green-400/40 text-green-300 text-sm font-bold px-4 py-2 rounded-full mb-6 hover:bg-green-500/30 transition">
+      <span class="w-2.5 h-2.5 bg-green-400 rounded-full live-dot inline-block"></span>
+      SESSÃO EM ANDAMENTO — Assistir ao Vivo
+    </a>
+    <h1 class="text-4xl md:text-5xl font-black leading-tight mb-4">
+      Votação Legislativa<br>
+      <span class="text-blue-400">Transparente e Auditável</span>
+    </h1>
+    <p class="text-slate-300 text-lg md:text-xl max-w-2xl mx-auto mb-10">
+      Plataforma de votação eletrônica para câmaras municipais com tempo real,
+      portal público de transparência e auditoria completa de todas as votações.
+    </p>
+    <div class="flex flex-wrap gap-4 justify-center">
+      <a href="publico/" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-4 rounded-xl text-lg transition shadow-lg">
+        📊 Ver Votações
+      </a>
+      <a href="painel/" class="border border-white/30 hover:bg-white/10 text-white font-bold px-8 py-4 rounded-xl text-lg transition">
+        📺 Painel ao Vivo
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── STATS ──────────────────────────────────────────────── -->
+<section class="bg-white py-10 px-4 shadow-sm">
+  <div class="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6">
+    <div class="stat-card text-center p-6 bg-blue-50 rounded-2xl">
+      <p class="text-4xl font-black text-blue-700" id="st-sessoes">—</p>
+      <p class="text-slate-500 text-sm font-semibold mt-1">Sessões Realizadas</p>
+    </div>
+    <div class="stat-card text-center p-6 bg-green-50 rounded-2xl">
+      <p class="text-4xl font-black text-green-700" id="st-aprovadas">—</p>
+      <p class="text-slate-500 text-sm font-semibold mt-1">Proposições Aprovadas</p>
+    </div>
+    <div class="stat-card text-center p-6 bg-red-50 rounded-2xl">
+      <p class="text-4xl font-black text-red-700" id="st-rejeitadas">—</p>
+      <p class="text-slate-500 text-sm font-semibold mt-1">Proposições Rejeitadas</p>
+    </div>
+    <div class="stat-card text-center p-6 bg-purple-50 rounded-2xl">
+      <p class="text-4xl font-black text-purple-700" id="st-vereadores">—</p>
+      <p class="text-slate-500 text-sm font-semibold mt-1">Vereadores Ativos</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── FUNCIONALIDADES ────────────────────────────────────── -->
+<section id="funcionalidades" class="py-16 px-4 bg-gray-50">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-black text-slate-800">Como funciona</h2>
+      <p class="text-slate-500 mt-2">Cada perfil tem sua interface dedicada</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <a href="controle/" class="feature-card bg-white rounded-2xl p-6 border border-slate-200 shadow-sm text-center block no-underline">
+        <div class="text-4xl mb-3">🖥️</div>
+        <h3 class="font-bold text-slate-800 mb-2">Mesa Diretora</h3>
+        <p class="text-slate-500 text-sm">Controla sessões, pauta, tribuna e abre/fecha votações em tempo real.</p>
+      </a>
+      <a href="vereador/" class="feature-card bg-white rounded-2xl p-6 border border-slate-200 shadow-sm text-center block no-underline">
+        <div class="text-4xl mb-3">📱</div>
+        <h3 class="font-bold text-slate-800 mb-2">Terminal Vereador</h3>
+        <p class="text-slate-500 text-sm">Cada parlamentar vota via tablet ou celular com autenticação por PIN.</p>
+      </a>
+      <a href="painel/" class="feature-card bg-white rounded-2xl p-6 border border-slate-200 shadow-sm text-center block no-underline">
+        <div class="text-4xl mb-3">📺</div>
+        <h3 class="font-bold text-slate-800 mb-2">Painel Plenário</h3>
+        <p class="text-slate-500 text-sm">Projeção em TV com placar em tempo real, votos e cronômetro da tribuna.</p>
+      </a>
+      <a href="publico/" class="feature-card bg-white rounded-2xl p-6 border border-slate-200 shadow-sm text-center block no-underline">
+        <div class="text-4xl mb-3">🔍</div>
+        <h3 class="font-bold text-slate-800 mb-2">Portal Público</h3>
+        <p class="text-slate-500 text-sm">Cidadãos consultam o histórico completo de votações com transparência total.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── SESSÃO AO VIVO (condicional) ──────────────────────── -->
+<div id="secao-ao-vivo" class="hidden bg-gradient-to-r from-green-600 to-emerald-700 py-10 px-4">
+  <div class="max-w-3xl mx-auto text-center text-white">
+    <div class="flex items-center justify-center gap-3 mb-4">
+      <span class="w-4 h-4 bg-white rounded-full live-dot inline-block"></span>
+      <h2 class="text-2xl font-black uppercase tracking-widest">Sessão em Andamento Agora</h2>
+    </div>
+    <p id="txt-sessao-live" class="text-green-100 text-lg mb-6"></p>
+    <a href="painel/" class="inline-block bg-white text-green-700 font-black text-lg px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transition">
+      📺 Assistir ao Painel ao Vivo →
+    </a>
+  </div>
+</div>
+
+<!-- ── SESSÕES RECENTES ────────────────────────────────────── -->
+<section class="py-16 px-4 bg-white">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
+      <h2 class="text-2xl font-black text-slate-800">Sessões Recentes</h2>
+      <a href="sessoes/" class="text-blue-600 font-semibold hover:underline text-sm">Ver todas →</a>
+    </div>
+    <div id="grid-sessoes" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <p class="text-slate-400 text-sm col-span-3 text-center py-8">Carregando...</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── RODAPÉ ─────────────────────────────────────────────── -->
+<footer class="bg-slate-900 text-slate-400 py-10 px-4">
+  <div class="max-w-5xl mx-auto flex flex-wrap gap-8 justify-between">
+    <div>
+      <p class="text-white font-bold text-lg mb-2">🏛️ Câmara Municipal</p>
+      <p class="text-sm max-w-xs">Sistema de Votação Eletrônica — plataforma para legislativos municipais com transparência e auditabilidade.</p>
+    </div>
+    <div>
+      <p class="text-white font-semibold mb-3 text-sm uppercase tracking-wider">Acesso Rápido</p>
+      <ul class="space-y-2 text-sm">
+        <li><a href="sessoes/" class="hover:text-white transition">Histórico de Sessões</a></li>
+        <li><a href="publico/" class="hover:text-white transition">Portal de Transparência</a></li>
+        <li><a href="painel/" class="hover:text-white transition">Painel ao Vivo</a></li>
+        <li><a href="login/" class="hover:text-white transition">Área Restrita</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="text-white font-semibold mb-3 text-sm uppercase tracking-wider">Documentação</p>
+      <ul class="space-y-2 text-sm">
+        <li><a href="../MANUAL_USUARIO.md" class="hover:text-white transition" target="_blank">Manual do Usuário</a></li>
+        <li><a href="../MANUAL_TECNICO.md" class="hover:text-white transition" target="_blank">Manual Técnico</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="max-w-5xl mx-auto mt-8 pt-6 border-t border-slate-800 text-center text-xs">
+    Sistema de Votação Eletrônica — Todos os direitos reservados.
+  </div>
+</footer>
+
+<script>
+const BASE = '..';
+
+async function carregarStats() {
+  try {
+    const r = await fetch(`${BASE}/api/resultados_publicos.php?action=historico&pagina=1`);
+    const json = await r.json();
+    if (!json.success) return;
+    const v = json.data?.votacoes ?? [];
+    let aprov = 0, rejeit = 0;
+    v.forEach(x => {
+      if (x.resultado === 'aprovado')  aprov++;
+      if (x.resultado === 'rejeitado') rejeit++;
+    });
+    document.getElementById('st-aprovadas').textContent  = aprov;
+    document.getElementById('st-rejeitadas').textContent = rejeit;
+    document.getElementById('st-sessoes').textContent    = json.data?.total ?? '—';
+  } catch {}
+}
+
+async function carregarVereadores() {
+  try {
+    const r = await fetch(`${BASE}/api/auth.php?action=lista_vereadores`);
+    const json = await r.json();
+    document.getElementById('st-vereadores').textContent = json.data?.length ?? '—';
+  } catch {}
+}
+
+async function verificarSessaoAtiva() {
+  try {
+    const r = await fetch(`${BASE}/api/sessoes.php?action=ativa`);
+    const json = await r.json();
+    if (json.data) {
+      const s = json.data;
+      document.getElementById('badge-live').classList.remove('hidden');
+      document.getElementById('secao-ao-vivo').classList.remove('hidden');
+      const label = { ordinaria:'Ordinária', extraordinaria:'Extraordinária', especial:'Especial' };
+      document.getElementById('txt-sessao-live').textContent =
+        `Sessão ${label[s.tipo] || s.tipo} nº ${s.numero} — em andamento`;
+    }
+  } catch {}
+}
+
+async function carregarSessoesRecentes() {
+  try {
+    const r = await fetch(`${BASE}/api/resultados_publicos.php?action=historico&pagina=1`);
+    const json = await r.json();
+    const map = {};
+    (json.data?.votacoes || []).forEach(v => {
+      const k = v.sessao_numero;
+      if (!map[k]) map[k] = { numero:v.sessao_numero, data:v.sessao_data, tipo:v.sessao_tipo||'ordinaria', count:0, aprov:0 };
+      map[k].count++;
+      if (v.resultado === 'aprovado') map[k].aprov++;
+    });
+    const lista = Object.values(map).slice(0, 3);
+    const grid  = document.getElementById('grid-sessoes');
+    if (!lista.length) {
+      grid.innerHTML = '<p class="text-slate-400 text-sm col-span-3 text-center py-8">Nenhuma sessão encerrada ainda.</p>';
+      return;
+    }
+    const tl = { ordinaria:'Ordinária', extraordinaria:'Extraordinária', especial:'Especial' };
+    grid.innerHTML = lista.map(s => {
+      const data = s.data ? s.data.split('-').reverse().join('/') : '';
+      return `
+        <a href="sessoes/" class="block bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl p-5 transition group">
+          <div class="flex items-start justify-between mb-3">
+            <span class="text-xs font-bold text-slate-400 uppercase">${tl[s.tipo]||s.tipo}</span>
+            <span class="text-xs text-slate-400">${data}</span>
+          </div>
+          <p class="text-slate-800 font-bold text-base group-hover:text-blue-700">Sessão nº ${s.numero}</p>
+          <p class="text-slate-500 text-xs mt-2">${s.count} votação(ões) · ${s.aprov} aprovada(s)</p>
+        </a>`;
+    }).join('');
+  } catch {}
+}
+
+carregarStats();
+carregarVereadores();
+verificarSessaoAtiva();
+carregarSessoesRecentes();
+</script>
+</body>
+</html>
