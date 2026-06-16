@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatórios com IA — WebVoto</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="/css/tenant.php">
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="max-w-5xl mx-auto px-4 py-10">
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-black text-slate-800 mb-1">✨ Relatórios com IA</h1>
+      <p class="text-slate-500 text-sm">Faça perguntas em linguagem natural e obtenha dados do banco de forma segura.</p>
+    </div>
+    <a href="relatorios.html" class="text-sm border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl font-semibold transition">← Relatórios Clássicos</a>
+  </div>
+
+  <!-- Exemplos de perguntas -->
+  <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+    <h2 class="font-bold text-slate-700 mb-3">Exemplos de Perguntas</h2>
+    <div class="flex flex-wrap gap-2">
+      <button onclick="usarExemplo(this)" class="example-btn bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-2 rounded-lg border border-purple-200 transition">
+        Quais sessões foram realizadas este mês?
+      </button>
+      <button onclick="usarExemplo(this)" class="example-btn bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-2 rounded-lg border border-purple-200 transition">
+        Quais proposições foram aprovadas nos últimos 30 dias?
+      </button>
+      <button onclick="usarExemplo(this)" class="example-btn bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-2 rounded-lg border border-purple-200 transition">
+        Qual vereador mais votou a favor nos últimos 3 meses?
+      </button>
+      <button onclick="usarExemplo(this)" class="example-btn bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-2 rounded-lg border border-purple-200 transition">
+        Mostre o total de votos por resultado na sessão mais recente
+      </button>
+      <button onclick="usarExemplo(this)" class="example-btn bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-2 rounded-lg border border-purple-200 transition">
+        Liste vereadores com status ativo e seu partido
+      </button>
+      <button onclick="usarExemplo(this)" class="example-btn bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-2 rounded-lg border border-purple-200 transition">
+        Quantas proposições de cada tipo existem?
+      </button>
+    </div>
+  </section>
+
+  <!-- Input de pergunta -->
+  <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+    <h2 class="font-bold text-slate-700 mb-3">Sua Pergunta</h2>
+    <div class="flex gap-3">
+      <textarea id="pergunta" rows="3" placeholder="Ex.: Quais sessões foram encerradas em 2024 e quantas votações tiveram?"
+        class="flex-1 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none font-inherit"></textarea>
+      <button onclick="consultarIA()" id="btn-consultar"
+        class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-xl transition self-end flex items-center gap-2">
+        <span id="btn-texto">Consultar</span>
+        <span id="btn-spinner" class="hidden">
+          <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+        </span>
+      </button>
+    </div>
+    <p class="text-xs text-slate-400 mt-2">A IA gera uma consulta SQL segura (somente leitura) e a executa no banco de dados.</p>
+  </section>
+
+  <!-- Resultado -->
+  <section id="resultado-section" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="font-bold text-slate-700">Resultado</h2>
+      <div class="flex items-center gap-3">
+        <span id="total-linhas" class="text-sm text-slate-500"></span>
+        <button onclick="exportarResultado()" class="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-semibold">↓ CSV</button>
+      </div>
+    </div>
+    <div class="p-4 bg-slate-900 text-slate-300 text-xs font-mono overflow-x-auto">
+      <div class="text-slate-500 text-xs mb-1 uppercase tracking-wider">SQL Gerado</div>
+      <code id="sql-gerado"></code>
+    </div>
+    <div id="explicacao" class="px-4 py-2 text-sm text-slate-600 bg-purple-50 border-b border-slate-100 italic"></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm" id="tabela-ia">
+        <thead id="thead-ia" class="bg-slate-50 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider"></thead>
+        <tbody id="tbody-ia" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+    <div id="sem-dados-ia" class="hidden text-center py-10 text-slate-400">Nenhum dado encontrado.</div>
+  </section>
+
+  <!-- Histórico -->
+  <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-bold text-slate-700">Histórico de Consultas</h2>
+      <button onclick="carregarHistorico()" class="text-xs text-blue-600 hover:text-blue-800 font-semibold">Atualizar</button>
+    </div>
+    <div id="historico" class="space-y-3">
+      <p class="text-slate-400 text-sm text-center py-4">Carregando...</p>
+    </div>
+  </section>
+</div>
+
+<script>
+const BASE = '../..';
+let ultimoDados = [];
+let ultimasColunas = [];
+
+function usarExemplo(btn) {
+  document.getElementById('pergunta').value = btn.textContent.trim();
+}
+
+async function consultarIA() {
+  const pergunta = document.getElementById('pergunta').value.trim();
+  if (!pergunta) { alert('Digite uma pergunta primeiro.'); return; }
+
+  const btn = document.getElementById('btn-consultar');
+  btn.disabled = true;
+  document.getElementById('btn-texto').classList.add('hidden');
+  document.getElementById('btn-spinner').classList.remove('hidden');
+  document.getElementById('resultado-section').classList.add('hidden');
+
+  try {
+    const r = await fetch(`${BASE}/api/ai-reports.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'gerar', question: pergunta }),
+    });
+    const j = await r.json();
+
+    if (!j.success) {
+      alert('Erro: ' + (j.error || 'Falha na consulta'));
+      return;
+    }
+
+    renderizarResultado(j.data);
+    carregarHistorico();
+  } catch (e) {
+    alert('Erro de comunicação: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    document.getElementById('btn-texto').classList.remove('hidden');
+    document.getElementById('btn-spinner').classList.add('hidden');
+  }
+}
+
+function renderizarResultado({ sql, explanation, colunas, dados }) {
+  document.getElementById('sql-gerado').textContent = sql || '';
+  document.getElementById('explicacao').textContent = explanation || '';
+  document.getElementById('total-linhas').textContent = `${dados?.length || 0} linhas`;
+  ultimaDados   = dados || [];
+  ultimasColunas = colunas || [];
+
+  const thead = document.getElementById('thead-ia');
+  const tbody = document.getElementById('tbody-ia');
+  const sem   = document.getElementById('sem-dados-ia');
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
+  document.getElementById('resultado-section').classList.remove('hidden');
+
+  if (!dados?.length) { sem.classList.remove('hidden'); return; }
+  sem.classList.add('hidden');
+
+  const tr = document.createElement('tr');
+  colunas.forEach(c => {
+    const th = document.createElement('th');
+    th.className = 'px-4 py-3';
+    th.textContent = c;
+    tr.appendChild(th);
+  });
+  thead.appendChild(tr);
+
+  dados.forEach(row => {
+    const tr2 = document.createElement('tr');
+    tr2.className = 'hover:bg-slate-50 transition';
+    Object.values(row).forEach(v => {
+      const td = document.createElement('td');
+      td.className = 'px-4 py-3 text-slate-700';
+      td.textContent = v ?? '';
+      tr2.appendChild(td);
+    });
+    tbody.appendChild(tr2);
+  });
+}
+
+function exportarResultado() {
+  if (!ultimaDados.length) return;
+  const bom  = '﻿';
+  const head = ultimasColunas.join(';');
+  const rows = ultimaDados.map(row => Object.values(row).map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';'));
+  const csv  = bom + [head, ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'relatorio-ia.csv';
+  a.click();
+}
+
+async function carregarHistorico() {
+  const r = await fetch(`${BASE}/api/ai-reports.php?action=historico`);
+  const j = await r.json();
+  const el = document.getElementById('historico');
+  if (!j.success || !j.data.length) {
+    el.innerHTML = '<p class="text-slate-400 text-sm text-center py-4">Nenhuma consulta realizada ainda.</p>';
+    return;
+  }
+  el.innerHTML = '';
+  j.data.forEach(item => {
+    const statusCls = { success: 'bg-green-100 text-green-700', error: 'bg-red-100 text-red-700', blocked: 'bg-amber-100 text-amber-700' }[item.status] || 'bg-slate-100 text-slate-700';
+    const div = document.createElement('div');
+    div.className = 'p-3 bg-slate-50 rounded-xl';
+    div.innerHTML = `
+      <div class="flex items-start justify-between gap-3 mb-1">
+        <p class="text-sm font-semibold text-slate-700 flex-1">${item.question}</p>
+        <span class="text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${statusCls}">${item.status}</span>
+      </div>
+      <div class="flex items-center gap-3 text-xs text-slate-400">
+        <span>${item.row_count ?? 0} linhas</span>
+        <span>${new Date(item.created_at).toLocaleString('pt-BR')}</span>
+        ${item.status === 'success' ? `<button onclick="refazer('${item.question.replace(/'/g, "\\'")}')" class="text-purple-600 hover:text-purple-800 font-semibold">Refazer</button>` : ''}
+      </div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+function refazer(pergunta) {
+  document.getElementById('pergunta').value = pergunta;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+carregarHistorico();
+</script>
+</body>
+</html>
