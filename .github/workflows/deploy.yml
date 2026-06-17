@@ -16,7 +16,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
             set -e
-            REPO_DIR=/var/www/camara-votacao
+            REPO_DIR=/var/www/webvoto
             if [ ! -d "$REPO_DIR/.git" ]; then
               echo "Clonando repositório pela primeira vez..."
               git clone https://${{ secrets.GH_PAT }}@github.com/carlosscarlato/camara-votacao.git "$REPO_DIR"
