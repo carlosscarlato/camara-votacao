@@ -16,7 +16,9 @@ switch ($action) {
         $sessaoId = (int)requiredInput('sessao_id');
         $stmt = db()->prepare("
             SELECT od.*, p.numero, p.ano, p.tipo, p.ementa,
-                   p.link_documento, p.pareceres, p.emendas, p.autor
+                   p.link_documento, p.pareceres, p.emendas, p.autor,
+                   (SELECT COUNT(*) FROM votos v WHERE v.ordem_dia_id = od.id)     AS votos_computados,
+                   (SELECT COUNT(*) FROM vereadores ver WHERE ver.status = 'ativo') AS total_vereadores
             FROM   ordem_do_dia od
             JOIN   proposicoes   p ON p.id = od.proposicao_id
             WHERE  od.sessao_id = ?
