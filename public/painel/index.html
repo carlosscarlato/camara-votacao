@@ -296,6 +296,9 @@ function renderPainel(data) {
   } else if (data.sessao) {
     renderGridVereadoressemVotos(data.sessao);
   }
+
+  // Tribuna — dados já vêm no painel_update, garantindo exibição mesmo se cronômetro SSE falhar
+  if (data.tribuna) renderTribuna(data.tribuna);
 }
 
 function renderGridVereadores(votos) {
