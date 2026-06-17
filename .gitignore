@@ -12,6 +12,9 @@ fix_*.php
 diag_*.php
 chk*.php
 verify_*.php
+test_db.php
+check_schema.php
+composer.phar
 
 # ── Logs ──────────────────────────────────────────────────
 *.log

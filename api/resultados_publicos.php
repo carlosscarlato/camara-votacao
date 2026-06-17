@@ -2,8 +2,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/helpers.php';
+require_once __DIR__ . '/../config/bootstrap.php';
 
 setCorsHeaders();
+startSession();
+resolveTenant();
 
 // Endpoint público — sem autenticação
 $action = getAction();

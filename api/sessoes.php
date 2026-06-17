@@ -2,8 +2,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/helpers.php';
+require_once __DIR__ . '/../config/bootstrap.php';
 
 setCorsHeaders();
+startSession();
+resolveTenant();
 $action = getAction();
 
 switch ($action) {
@@ -15,9 +18,10 @@ switch ($action) {
 
     // ── Listar todas as sessões ───────────────────────────────
     case 'listar':
-        $stmt = db()->query(
-            "SELECT * FROM sessoes_plenarias ORDER BY data DESC, id DESC LIMIT 100"
+        $stmt = db()->prepare(
+            "SELECT * FROM sessoes_plenarias WHERE tenant_id = ? ORDER BY data DESC, id DESC LIMIT 100"
         );
+        $stmt->execute([tenantId()]);
         jsonSuccess($stmt->fetchAll());
 
     // ── Iniciar sessão ────────────────────────────────────────
@@ -39,10 +43,10 @@ switch ($action) {
         }
 
         $stmt = db()->prepare("
-            INSERT INTO sessoes_plenarias (numero, data, tipo, status)
-            VALUES (?, ?, ?, 'em_andamento')
+            INSERT INTO sessoes_plenarias (tenant_id, numero, data, tipo, status)
+            VALUES (?, ?, ?, ?, 'em_andamento')
         ");
-        $stmt->execute([$numero, $data, $tipo]);
+        $stmt->execute([tenantId(), $numero, $data, $tipo]);
         $id = (int)db()->lastInsertId();
 
         jsonSuccess(['id' => $id, 'numero' => $numero, 'data' => $data, 'tipo' => $tipo]);
@@ -55,17 +59,19 @@ switch ($action) {
 
         // Verifica se há votação aberta
         $stmt = db()->prepare(
-            "SELECT id FROM ordem_do_dia WHERE sessao_id = ? AND status_votacao = 'votando'"
+            "SELECT od.id FROM ordem_do_dia od
+             JOIN sessoes_plenarias s ON s.id = od.sessao_id
+             WHERE od.sessao_id = ? AND od.status_votacao = 'votando' AND s.tenant_id = ?"
         );
-        $stmt->execute([$sessaoId]);
+        $stmt->execute([$sessaoId, tenantId()]);
         if ($stmt->fetch()) {
             jsonError('Encerre a votação em aberto antes de encerrar a sessão.');
         }
 
         $stmt = db()->prepare(
-            "UPDATE sessoes_plenarias SET status = 'encerrada' WHERE id = ? AND status = 'em_andamento'"
+            "UPDATE sessoes_plenarias SET status = 'encerrada' WHERE id = ? AND status = 'em_andamento' AND tenant_id = ?"
         );
-        $stmt->execute([$sessaoId]);
+        $stmt->execute([$sessaoId, tenantId()]);
 
         if ($stmt->rowCount() === 0) {
             jsonError('Sessão não encontrada ou já encerrada.');

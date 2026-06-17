@@ -1,0 +1,55 @@
+name: Setup VPS (executar uma vez)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Migrations + MySQL readonly user + Nginx
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 5m
+          script: |
+            set -e
+            APP_DIR=/var/www/camara-votacao
+            DB_NAME=camara_votacao
+
+            echo "=== [1/4] Rodando migrations ==="
+            mysql "$DB_NAME" < "$APP_DIR/migrations/001_multi_tenant.sql"  && echo "001 OK" || echo "001 WARN (pode ja existir)"
+            mysql "$DB_NAME" < "$APP_DIR/migrations/002_reports.sql"       && echo "002 OK" || echo "002 WARN"
+            mysql "$DB_NAME" < "$APP_DIR/migrations/003_ai_chat.sql"       && echo "003 OK" || echo "003 WARN"
+            mysql "$DB_NAME" < "$APP_DIR/migrations/004_complementar.sql"  && echo "004 OK" || echo "004 WARN"
+
+            echo "=== [2/4] Criando usuario webvoto_readonly ==="
+            mysql -e "CREATE USER IF NOT EXISTS 'webvoto_readonly'@'localhost' IDENTIFIED BY 'R3adOnly!2024';"
+            mysql -e "GRANT SELECT ON $DB_NAME.* TO 'webvoto_readonly'@'localhost';"
+            mysql -e "FLUSH PRIVILEGES;"
+            echo "Readonly user OK"
+
+            echo "=== [3/4] Detectando config Nginx ==="
+            NGINX_CONF=$(grep -rl "camara-votacao\|camara_votacao\|webvoto" /etc/nginx/sites-enabled/ 2>/dev/null | head -1)
+            if [ -z "$NGINX_CONF" ]; then
+              NGINX_CONF=$(ls /etc/nginx/sites-enabled/ | head -1)
+              NGINX_CONF="/etc/nginx/sites-enabled/$NGINX_CONF"
+            fi
+            echo "Config Nginx: $NGINX_CONF"
+
+            echo "=== [4/4] Adicionando ANTHROPIC_API_KEY ao Nginx ==="
+            if [ -n "$NGINX_CONF" ] && [ -f "$NGINX_CONF" ]; then
+              if grep -q "ANTHROPIC_API_KEY" "$NGINX_CONF"; then
+                echo "ANTHROPIC_API_KEY ja configurado"
+              else
+                sed -i '/fastcgi_pass/i\            fastcgi_param ANTHROPIC_API_KEY "${{ secrets.ANTHROPIC_API_KEY }}";' "$NGINX_CONF"
+                echo "ANTHROPIC_API_KEY inserido em $NGINX_CONF"
+                nginx -t && systemctl reload nginx
+              fi
+            else
+              echo "AVISO: config Nginx nao encontrado - configure manualmente"
+            fi
+
+            echo "=== Setup VPS concluido ==="

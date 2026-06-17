@@ -6,15 +6,30 @@ require_once __DIR__ . '/database.php';
 // ── Sessão PHP ────────────────────────────────────────────
 function startSession(): void
 {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_set_cookie_params([
-            'lifetime' => 28800,
-            'path'     => '/',
-            'secure'   => isProduction(), // true automaticamente em HTTPS
-            'httponly' => true,
-            'samesite' => 'Strict',
-        ]);
+    if (session_status() !== PHP_SESSION_NONE) return;
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'secure'   => isProduction(),
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+    session_start();
+
+    // Timeout configurável por tenant (padrão 30 min)
+    $timeout = (int)($_SESSION['tenant_data']['session_timeout_minutes'] ?? 30) * 60;
+    if (isset($_SESSION['_last_activity']) && (time() - $_SESSION['_last_activity']) > $timeout) {
+        session_destroy();
         session_start();
+    }
+    $_SESSION['_last_activity'] = time();
+
+    // Regenera ID a cada 15 min para prevenir fixação de sessão
+    if (!isset($_SESSION['_created'])) {
+        $_SESSION['_created'] = time();
+    } elseif (time() - $_SESSION['_created'] > 900) {
+        session_regenerate_id(true);
+        $_SESSION['_created'] = time();
     }
 }
 
@@ -35,17 +50,45 @@ function jsonError(string $message, int $code = 400): never
     exit;
 }
 
-// ── CORS ───────────────────────────────────────────────────
+// ── CORS + Headers de segurança HTTP ──────────────────────
 function setCorsHeaders(): void
 {
-    $origin = defined('APP_DOMAIN') ? APP_DOMAIN : 'http://localhost';
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-XSS-Protection: 1; mode=block');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data: blob:; connect-src 'self';");
+    if (isProduction()) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
+
+    $origin = defined('APP_DOMAIN') ? APP_DOMAIN : ($_SERVER['HTTP_ORIGIN'] ?? 'http://localhost');
     header("Access-Control-Allow-Origin: $origin");
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
+    header('Access-Control-Allow-Headers: Content-Type, X-Requested-With, X-CSRF-Token, Authorization');
     header('Access-Control-Allow-Credentials: true');
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         http_response_code(204);
         exit;
+    }
+}
+
+// ── CSRF ───────────────────────────────────────────────────
+function generateCsrfToken(): string
+{
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function validateCsrfToken(): void
+{
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['_csrf'] ?? '';
+    if (!hash_equals((string)($_SESSION['csrf_token'] ?? ''), $token)) {
+        http_response_code(403);
+        die(json_encode(['success' => false, 'error' => 'CSRF token inválido.']));
     }
 }
 
@@ -146,50 +189,68 @@ function requiredInput(string $key): mixed
     return $val;
 }
 
-// ── Sessão plenária ativa ──────────────────────────────────
+// ── Tenant helpers ─────────────────────────────────────────
+function tenantId(): int
+{
+    return defined('TENANT_ID') ? TENANT_ID : (int)($_SESSION['tenant_id'] ?? 1);
+}
+
+function requireSuperAdmin(): void
+{
+    startSession();
+    if (empty($_SESSION['is_super_admin'])) {
+        jsonError('Acesso exclusivo para Super Admin.', 403);
+    }
+}
+
+function isSuperAdmin(): bool
+{
+    return !empty($_SESSION['is_super_admin']);
+}
+
+// ── getSessaoAtiva / getVotacaoAtiva agora filtram por tenant ─
 function getSessaoAtiva(): ?array
 {
     $stmt = db()->prepare(
-        "SELECT * FROM sessoes_plenarias WHERE status = 'em_andamento' ORDER BY id DESC LIMIT 1"
+        "SELECT * FROM sessoes_plenarias WHERE status = 'em_andamento' AND tenant_id = ? ORDER BY id DESC LIMIT 1"
     );
-    $stmt->execute();
+    $stmt->execute([tenantId()]);
     return $stmt->fetch() ?: null;
 }
 
-// ── Votação ativa ──────────────────────────────────────────
 function getVotacaoAtiva(): ?array
 {
     $stmt = db()->prepare("
         SELECT od.*, p.numero, p.ano, p.tipo, p.ementa, p.link_documento,
                p.pareceres, p.emendas, p.autor
         FROM   ordem_do_dia od
-        JOIN   proposicoes   p  ON p.id = od.proposicao_id
-        JOIN   sessoes_plenarias s ON s.id = od.sessao_id
+        JOIN   proposicoes        p ON p.id = od.proposicao_id
+        JOIN   sessoes_plenarias  s ON s.id = od.sessao_id
         WHERE  od.status_votacao = 'votando'
-          AND  s.status = 'em_andamento'
+          AND  s.status          = 'em_andamento'
+          AND  s.tenant_id       = ?
         LIMIT  1
     ");
-    $stmt->execute();
+    $stmt->execute([tenantId()]);
     return $stmt->fetch() ?: null;
 }
 
-// ── Discussão ativa ────────────────────────────────────────
 function getDiscussaoAtiva(): ?array
 {
     $stmt = db()->prepare("
         SELECT od.*, p.numero, p.ano, p.tipo, p.ementa, p.autor
         FROM   ordem_do_dia od
-        JOIN   proposicoes   p  ON p.id = od.proposicao_id
-        JOIN   sessoes_plenarias s ON s.id = od.sessao_id
+        JOIN   proposicoes        p ON p.id = od.proposicao_id
+        JOIN   sessoes_plenarias  s ON s.id = od.sessao_id
         WHERE  od.status_votacao = 'em_discussao'
-          AND  s.status = 'em_andamento'
+          AND  s.status          = 'em_andamento'
+          AND  s.tenant_id       = ?
         LIMIT  1
     ");
-    $stmt->execute();
+    $stmt->execute([tenantId()]);
     return $stmt->fetch() ?: null;
 }
 
-// ── Tribuna ativa ──────────────────────────────────────────
 function getTribunaAtiva(): ?array
 {
     $stmt = db()->prepare("
@@ -199,10 +260,11 @@ function getTribunaAtiva(): ?array
         JOIN   sessoes_plenarias s ON s.id = ct.sessao_id
         WHERE  ct.status IN ('aguardando','falando','pausado')
           AND  s.status = 'em_andamento'
+          AND  s.tenant_id = ?
         ORDER  BY ct.id DESC
         LIMIT  1
     ");
-    $stmt->execute();
+    $stmt->execute([tenantId()]);
     return $stmt->fetch() ?: null;
 }
 

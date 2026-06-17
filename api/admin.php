@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
+require_once __DIR__ . '/../config/bootstrap.php';
 
 setCorsHeaders();
+startSession();
+resolveTenant();
 $auth = requireAdminAuth();
 
 function requireAdmin(array $auth): void
@@ -24,13 +27,12 @@ switch ($action) {
 
     case 'listar_usuarios':
         requireAdmin($auth);
-        $rows = db()->query("
-            SELECT id, nome, login, email, perfil, permissao_level, ativo,
-                   created_at
-            FROM   usuarios
-            ORDER  BY nome
-        ")->fetchAll();
-        jsonSuccess($rows);
+        $stmt = db()->prepare("
+            SELECT id, nome, login, email, perfil, permissao_level, ativo, created_at
+            FROM   usuarios WHERE tenant_id = ? ORDER BY nome
+        ");
+        $stmt->execute([tenantId()]);
+        jsonSuccess($stmt->fetchAll());
 
     case 'criar_usuario':
         requireAdmin($auth);
@@ -48,9 +50,9 @@ switch ($action) {
         $hash = password_hash($senha, PASSWORD_BCRYPT, ['cost' => 12]);
         try {
             db()->prepare("
-                INSERT INTO usuarios (nome, login, email, senha_hash, perfil)
-                VALUES (?, ?, ?, ?, ?)
-            ")->execute([$nome, $login, $email, $hash, $perfil]);
+                INSERT INTO usuarios (tenant_id, nome, login, email, senha_hash, perfil)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ")->execute([tenantId(), $nome, $login, $email, $hash, $perfil]);
         } catch (\PDOException) {
             jsonError('Login ou e-mail já cadastrado.', 409);
         }
@@ -91,12 +93,12 @@ switch ($action) {
     // ────────────────────────────────────────────────────────
 
     case 'listar_vereadores':
-        $rows = db()->query("
+        $stmt = db()->prepare("
             SELECT id, nome, partido, email, cargo_id, status, pin, foto, created_at
-            FROM   vereadores
-            ORDER  BY nome
-        ")->fetchAll();
-        jsonSuccess($rows);
+            FROM   vereadores WHERE tenant_id = ? ORDER BY nome
+        ");
+        $stmt->execute([tenantId()]);
+        jsonSuccess($stmt->fetchAll());
 
     case 'criar_vereador':
         requireAdmin($auth);
@@ -109,8 +111,8 @@ switch ($action) {
         if (!preg_match('/^\d{6}$/', $pin)) jsonError('PIN deve ter exatamente 6 dígitos.');
 
         db()->prepare("
-            INSERT INTO vereadores (nome, partido, pin, email, cargo_id) VALUES (?,?,?,?,?)
-        ")->execute([$nome, $partido, $pin, $email, $cargo]);
+            INSERT INTO vereadores (tenant_id, nome, partido, pin, email, cargo_id) VALUES (?,?,?,?,?,?)
+        ")->execute([tenantId(), $nome, $partido, $pin, $email, $cargo]);
         $newId = (int)db()->lastInsertId();
         registrarLog('vereador_criado', $auth['id'], $newId, "nome: $nome");
         jsonSuccess(['id' => $newId, 'message' => 'Vereador criado com sucesso.']);
@@ -184,12 +186,12 @@ switch ($action) {
             jsonError('Não é possível excluir: vereador possui histórico de tribuna. Use "Inativar" para desabilitar o acesso.', 409);
         }
 
-        $stmtN = db()->prepare("SELECT nome FROM vereadores WHERE id = ?");
-        $stmtN->execute([$id]);
+        $stmtN = db()->prepare("SELECT nome FROM vereadores WHERE id = ? AND tenant_id = ?");
+        $stmtN->execute([$id, tenantId()]);
         $vereador = $stmtN->fetch();
         if (!$vereador) jsonError('Vereador não encontrado.', 404);
 
-        db()->prepare("DELETE FROM vereadores WHERE id = ?")->execute([$id]);
+        db()->prepare("DELETE FROM vereadores WHERE id = ? AND tenant_id = ?")->execute([$id, tenantId()]);
         registrarLog('vereador_deletado', $auth['id'], null, "id: $id nome: {$vereador['nome']}");
         jsonSuccess(['message' => 'Vereador excluído com sucesso.']);
 
@@ -202,6 +204,7 @@ switch ($action) {
         $limit  = min((int)input('limit', 100), 500);
         $offset = (int)input('offset', 0);
 
+        $tid2 = tenantId();
         $stmt = db()->prepare("
             SELECT l.id, l.acao, l.detalhes, l.ip_origem, l.created_at,
                    u.nome AS usuario_nome,
@@ -209,11 +212,14 @@ switch ($action) {
             FROM   logs_sistema l
             LEFT JOIN usuarios   u ON u.id = l.usuario_id
             LEFT JOIN vereadores v ON v.id = l.vereador_id
+            WHERE  l.tenant_id = ?
             ORDER  BY l.id DESC
             LIMIT  ? OFFSET ?
         ");
-        $stmt->execute([$limit, $offset]);
-        $total = (int)db()->query("SELECT COUNT(*) FROM logs_sistema")->fetchColumn();
+        $stmt->execute([$tid2, $limit, $offset]);
+        $tcnt = db()->prepare("SELECT COUNT(*) FROM logs_sistema WHERE tenant_id = ?");
+        $tcnt->execute([$tid2]);
+        $total = (int)$tcnt->fetchColumn();
         jsonSuccess(['logs' => $stmt->fetchAll(), 'total' => $total]);
 
     default:
