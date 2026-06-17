@@ -207,7 +207,8 @@ function togglePass(id, btn) {
 
 const BASE = '../..';
 let estado = { vereadorId: null, ordemDiaId: null, votacaoAberta: false, meuVoto: null };
-let evtSource = null;
+let pollingTimer = null;
+let ultimoEstadoHash = '';
 
 // ── Carregar vereadores ───────────────────────────────────
 async function carregarVereadores() {
@@ -251,25 +252,30 @@ document.getElementById('btn-login').addEventListener('click', async () => {
   document.getElementById('tela-app').classList.remove('hidden');
   document.getElementById('tela-app').classList.add('flex');
 
-  iniciarSSE();
+  iniciarPolling();
 });
 
-// ── SSE ───────────────────────────────────────────────────
-function iniciarSSE() {
-  evtSource = new EventSource(`${BASE}/sse/vereador.php?vereador_id=${estado.vereadorId}`);
+// ── Polling ───────────────────────────────────────────────
+function iniciarPolling() {
+  buscarEstado();
+  pollingTimer = setInterval(buscarEstado, 2000);
+}
 
-  evtSource.addEventListener('vereador_update', e => {
-    const data = JSON.parse(e.data);
-    renderEstado(data);
-  });
-
-  evtSource.onerror = () => {
+async function buscarEstado() {
+  try {
+    const r = await fetch(`${BASE}/api/vereador-status.php?vereador_id=${estado.vereadorId}`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const json = await r.json();
+    if (!json.success) throw new Error(json.error);
+    const hash = JSON.stringify(json.data);
+    if (hash !== ultimoEstadoHash) {
+      ultimoEstadoHash = hash;
+      renderEstado(json.data);
+    }
+    document.getElementById('hdr-status').innerHTML = '<span class="text-green-400">● Conectado</span>';
+  } catch {
     document.getElementById('hdr-status').innerHTML = '<span class="text-red-400">● Reconectando...</span>';
-    setTimeout(() => {
-      if (evtSource) evtSource.close();
-      iniciarSSE();
-    }, 3000);
-  };
+  }
 }
 
 // ── Renderizar estado ─────────────────────────────────────
@@ -473,7 +479,7 @@ document.getElementById('btn-fechar-modal').addEventListener('click', () => {
 document.getElementById('btn-logout').addEventListener('click', async () => {
   if (!confirm('Deseja realmente sair?')) return;
   await fetch(`${BASE}/api/auth.php?action=logout`, { method: 'POST' });
-  if (evtSource) evtSource.close();
+  clearInterval(pollingTimer);
   location.reload();
 });
 
