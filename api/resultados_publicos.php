@@ -25,6 +25,8 @@ switch ($action) {
                 od.id                AS ordem_dia_id,
                 od.encerrado_em,
                 od.resultado,
+                od.tipo_aprovacao,
+                od.parte,
                 od.votos_sim,
                 od.votos_nao,
                 od.votos_abstencao,
@@ -63,7 +65,8 @@ switch ($action) {
         $ordemDiaId = (int)requiredInput('ordem_dia_id');
 
         $stmt = db()->prepare("
-            SELECT od.id, od.resultado, od.votos_sim, od.votos_nao,
+            SELECT od.id, od.resultado, od.tipo_aprovacao, od.parte,
+                   od.votos_sim, od.votos_nao,
                    od.votos_abstencao, od.votos_ausente, od.aberto_em, od.encerrado_em,
                    p.numero, p.ano, p.tipo, p.ementa, p.autor,
                    s.numero AS sessao_numero, s.data AS sessao_data

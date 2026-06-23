@@ -160,6 +160,38 @@ function renderGrid() {
   }).join('');
 }
 
+function renderItemSessao(item) {
+  const resMap = {
+    aprovado:  ['bg-green-100 text-green-800','✓ Aprovado'],
+    rejeitado: ['bg-red-100 text-red-800','✗ Rejeitado'],
+    empate:    ['bg-blue-100 text-blue-800','≈ Empate'],
+  };
+  const isAclam = item.tipo_aprovacao === 'aclamacao';
+  let resTxt = '';
+  if (item.resultado === 'aprovado') resTxt = isAclam ? '✓ Aprovado por aclamação' : '✓ Aprovado';
+  else if (item.resultado === 'rejeitado') resTxt = isAclam ? '✗ Rejeitado por aclamação' : '✗ Rejeitado';
+  else if (item.resultado === 'empate') resTxt = '≈ Empate';
+  const [resCls] = resMap[item.resultado] || ['bg-slate-100 text-slate-600'];
+
+  const votos = !isAclam ? `
+    <div class="flex gap-2 flex-wrap text-xs font-bold mt-2">
+      <span class="bg-green-50 text-green-700 px-2 py-1 rounded">✔ ${item.votos_sim} SIM</span>
+      <span class="bg-red-50 text-red-700 px-2 py-1 rounded">✗ ${item.votos_nao} NÃO</span>
+      <span class="bg-yellow-50 text-yellow-700 px-2 py-1 rounded">≈ ${item.votos_abstencao} ABST.</span>
+    </div>
+    <button onclick="verDetalhe(${item.ordem_dia_id})" class="text-blue-600 text-xs mt-2 hover:underline">Ver votação nominal →</button>` : '';
+
+  return `
+    <div class="border border-slate-200 rounded-xl p-4">
+      <div class="flex items-start justify-between gap-3 mb-2 flex-wrap">
+        <p class="font-bold text-slate-800 text-sm">${escHtml(item.prop_tipo)} nº ${escHtml(item.prop_numero)}/${escHtml(item.prop_ano)}</p>
+        <span class="text-xs font-bold px-3 py-1 rounded-full ${resCls}">${resTxt}</span>
+      </div>
+      <p class="text-slate-500 text-xs leading-relaxed">${escHtml(item.prop_ementa)}</p>
+      ${votos}
+    </div>`;
+}
+
 function abrirSessao(numero) {
   const s = todasSessoes.find(x => x.numero === numero);
   if (!s) return;
@@ -169,30 +201,21 @@ function abrirSessao(numero) {
   document.getElementById('modal-titulo').textContent    = `Sessão nº ${s.numero}`;
   document.getElementById('modal-subtitulo').textContent = `${tl[s.tipo]||s.tipo} — ${data}`;
 
-  const corpo = document.getElementById('modal-corpo');
-  corpo.innerHTML = s.itens.map(item => {
-    const resMap = {
-      aprovado:  ['bg-green-100 text-green-800','✓ Aprovado'],
-      rejeitado: ['bg-red-100 text-red-800','✗ Rejeitado'],
-      empate:    ['bg-blue-100 text-blue-800','≈ Empate'],
-    };
-    const [resCls, resTxt] = resMap[item.resultado] || ['bg-slate-100 text-slate-600', item.resultado];
-    return `
-      <div class="border border-slate-200 rounded-xl p-4">
-        <div class="flex items-start justify-between gap-3 mb-2 flex-wrap">
-          <p class="font-bold text-slate-800 text-sm">${escHtml(item.prop_tipo)} nº ${escHtml(item.prop_numero)}/${escHtml(item.prop_ano)}</p>
-          <span class="text-xs font-bold px-3 py-1 rounded-full ${resCls}">${resTxt}</span>
-        </div>
-        <p class="text-slate-500 text-xs leading-relaxed mb-2">${escHtml(item.prop_ementa)}</p>
-        <div class="flex gap-2 flex-wrap text-xs font-bold">
-          <span class="bg-green-50 text-green-700 px-2 py-1 rounded">✔ ${item.votos_sim} SIM</span>
-          <span class="bg-red-50 text-red-700 px-2 py-1 rounded">✗ ${item.votos_nao} NÃO</span>
-          <span class="bg-yellow-50 text-yellow-700 px-2 py-1 rounded">≈ ${item.votos_abstencao} ABST.</span>
-        </div>
-        <button onclick="verDetalhe(${item.ordem_dia_id})" class="text-blue-600 text-xs mt-2 hover:underline">Ver votação nominal →</button>
-      </div>`;
-  }).join('');
+  const expItens = s.itens.filter(i => i.parte === 'expediente');
+  const odItens  = s.itens.filter(i => !i.parte || i.parte === 'ordem_do_dia');
 
+  let html = '';
+  if (expItens.length) {
+    html += `<p class="text-xs font-bold uppercase tracking-widest text-slate-400 pb-1 border-b border-slate-100">📎 Expediente</p>`;
+    html += expItens.map(renderItemSessao).join('');
+  }
+  if (odItens.length) {
+    html += `<p class="text-xs font-bold uppercase tracking-widest text-slate-400 pb-1 border-b border-slate-100 ${expItens.length ? 'mt-4' : ''}">📋 Ordem do Dia</p>`;
+    html += odItens.map(renderItemSessao).join('');
+  }
+  if (!html) html = '<p class="text-slate-400 text-sm text-center py-6">Nenhum item nesta sessão.</p>';
+
+  document.getElementById('modal-corpo').innerHTML = html;
   document.getElementById('modal').classList.remove('hidden');
 }
 
@@ -208,18 +231,21 @@ async function verDetalhe(ordemDiaId) {
     rejeitado: ['bg-red-100 border-red-300 text-red-800','✗ REJEITADO'],
     empate:    ['bg-blue-100 border-blue-300 text-blue-800','≈ EMPATE'],
   };
-  const [rCls, rTxt] = resMap[votacao.resultado] || ['bg-slate-100 border-slate-300 text-slate-700', votacao.resultado];
+  const isAclam = votacao.tipo_aprovacao === 'aclamacao';
+  let rTxt = votacao.resultado === 'aprovado'
+    ? (isAclam ? '✓ APROVADO POR ACLAMAÇÃO' : '✓ APROVADO')
+    : votacao.resultado === 'rejeitado'
+      ? (isAclam ? '✗ REJEITADO POR ACLAMAÇÃO' : '✗ REJEITADO')
+      : '≈ EMPATE';
+  const [rCls] = resMap[votacao.resultado] || ['bg-slate-100 border-slate-300 text-slate-700'];
   const vMap = { SIM:'voto-sim', NAO:'voto-nao', ABSTENCAO:'voto-abst', AUSENTE:'voto-aus' };
   const vLabel = { SIM:'✔ SIM', NAO:'✘ NÃO', ABSTENCAO:'≈ ABST.', AUSENTE:'— AUSENTE' };
 
-  document.getElementById('modal-titulo').textContent    = `${votacao.tipo} nº ${votacao.numero}/${votacao.ano}`;
-  document.getElementById('modal-subtitulo').textContent = `Sessão ${votacao.sessao_numero}`;
-  document.getElementById('modal-corpo').innerHTML = `
-    <div class="border rounded-xl p-4 text-center ${rCls}">
-      <p class="text-xl font-black">${rTxt}</p>
-      <p class="text-sm mt-1">${votacao.votos_sim} SIM · ${votacao.votos_nao} NÃO · ${votacao.votos_abstencao} ABST. · ${votacao.votos_ausente} Ausentes</p>
-    </div>
-    <p class="text-slate-600 text-sm leading-relaxed">${escHtml(votacao.ementa)}</p>
+  const placarHtml = !isAclam
+    ? `<p class="text-sm mt-1">${votacao.votos_sim} SIM · ${votacao.votos_nao} NÃO · ${votacao.votos_abstencao} ABST. · ${votacao.votos_ausente} Ausentes</p>`
+    : '';
+
+  const votosHtml = !isAclam ? `
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
       ${votos.map(v => `
         <div class="flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2">
@@ -229,7 +255,17 @@ async function verDetalhe(ordemDiaId) {
           </div>
           <span class="text-xs font-bold px-2 py-1 rounded ${vMap[v.voto]||''}">${vLabel[v.voto] ? escHtml(vLabel[v.voto]) : escHtml(v.voto)}</span>
         </div>`).join('')}
-    </div>`;
+    </div>` : '';
+
+  document.getElementById('modal-titulo').textContent    = `${votacao.tipo} nº ${votacao.numero}/${votacao.ano}`;
+  document.getElementById('modal-subtitulo').textContent = `Sessão ${votacao.sessao_numero}`;
+  document.getElementById('modal-corpo').innerHTML = `
+    <div class="border rounded-xl p-4 text-center ${rCls}">
+      <p class="text-xl font-black">${rTxt}</p>
+      ${placarHtml}
+    </div>
+    <p class="text-slate-600 text-sm leading-relaxed">${escHtml(votacao.ementa)}</p>
+    ${votosHtml}`;
   document.getElementById('modal').classList.remove('hidden');
 }
 

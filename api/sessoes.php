@@ -79,6 +79,38 @@ switch ($action) {
 
         jsonSuccess(['message' => 'Sessão encerrada com sucesso.']);
 
+    // ── Avançar fase da sessão ───────────────────────────────
+    case 'avancar_parte':
+        requireAdminAuth();
+
+        $sessaoId = (int)requiredInput('sessao_id');
+        $parte    = (string)requiredInput('parte');
+
+        if (!in_array($parte, ['expediente', 'ordem_do_dia'])) {
+            jsonError('Parte inválida.');
+        }
+
+        $stmt = db()->prepare(
+            "SELECT id, parte_atual FROM sessoes_plenarias WHERE id = ? AND status = 'em_andamento' AND tenant_id = ?"
+        );
+        $stmt->execute([$sessaoId, tenantId()]);
+        $sessao = $stmt->fetch();
+        if (!$sessao) jsonError('Sessão não encontrada ou inativa.');
+
+        $ordem = [null => 0, 'expediente' => 1, 'ordem_do_dia' => 2];
+        $idxAtual = $ordem[$sessao['parte_atual']] ?? 0;
+        $idxNova  = $ordem[$parte];
+
+        if ($idxNova <= $idxAtual) {
+            jsonError('Não é possível voltar para uma fase anterior.');
+        }
+
+        db()->prepare(
+            "UPDATE sessoes_plenarias SET parte_atual = ? WHERE id = ?"
+        )->execute([$parte, $sessaoId]);
+
+        jsonSuccess(['parte_atual' => $parte]);
+
     default:
         jsonError('Ação inválida.');
 }

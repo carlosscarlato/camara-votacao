@@ -93,6 +93,7 @@
   <div>
     <h1 class="text-amber-300 font-extrabold text-2xl tracking-wide uppercase">🏛️ Câmara Municipal</h1>
     <p id="hdr-sessao" class="text-amber-500 text-sm font-semibold">Aguardando sessão...</p>
+    <span id="hdr-parte" class="hidden text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded mt-1 inline-block"></span>
   </div>
   <div class="text-right">
     <p id="hdr-data" class="text-amber-400 text-sm"></p>
@@ -248,6 +249,17 @@ function renderPainel(data) {
   if (data.sessao) {
     document.getElementById('hdr-sessao').textContent =
       `${data.sessao.tipo.charAt(0).toUpperCase() + data.sessao.tipo.slice(1)} nº ${data.sessao.numero}`;
+
+    const parteEl = document.getElementById('hdr-parte');
+    const faseLabels = {
+      null:          { label: 'Pequeno Expediente', cls: 'bg-slate-700 text-slate-300' },
+      'expediente':  { label: 'Expediente',          cls: 'bg-indigo-800 text-indigo-200' },
+      'ordem_do_dia':{ label: 'Ordem do Dia',        cls: 'bg-amber-800 text-amber-200' },
+    };
+    const fase = faseLabels[data.sessao.parte_atual ?? null] || faseLabels[null];
+    parteEl.textContent = fase.label;
+    parteEl.className = `text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded mt-1 inline-block ${fase.cls}`;
+    parteEl.classList.remove('hidden');
   }
 
   const votacao = data.votacao;

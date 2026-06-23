@@ -59,6 +59,28 @@
   .toast.show { transform: translateX(0); }
   .toast.success { border-color: #16a34a; }
   .toast.error   { border-color: #dc2626; }
+  .fase-step { display: flex; flex-direction: column; align-items: center; position: relative; }
+  .fase-step-circle {
+    width: 28px; height: 28px; border-radius: 50%; border: 2px solid #334155;
+    background: #0f172a; display: flex; align-items: center; justify-content: center;
+    font-size: .7rem; font-weight: 700; color: #64748b; position: relative; z-index: 1;
+  }
+  .fase-step.ativa .fase-step-circle   { border-color: #3b82f6; background: #1e3a5f; color: #93c5fd; }
+  .fase-step.concluida .fase-step-circle { border-color: #16a34a; background: #064e3b; color: #4ade80; }
+  .fase-step-label { font-size: .6rem; color: #64748b; margin-top: 4px; text-align: center; font-weight: 600; white-space: nowrap; }
+  .fase-step.ativa .fase-step-label   { color: #93c5fd; }
+  .fase-step.concluida .fase-step-label { color: #4ade80; }
+  .fase-conn { flex: 1; height: 2px; background: #334155; margin-top: -15px; min-width: 8px; }
+  .fase-conn.concluida { background: #16a34a; }
+  .sec-title { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin-bottom: 8px; padding-top: 2px; }
+  .tab-btn { padding: 5px 14px; font-size: .78rem; font-weight: 600; border-radius: 8px; cursor: pointer; border: 1px solid #334155; background: transparent; color: #94a3b8; transition: all .2s; }
+  .tab-btn.ativa { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .btn-aclam-sim { background: #15803d; }
+  .btn-aclam-sim:hover { background: #166534; }
+  .btn-aclam-rej { background: #b91c1c; }
+  .btn-aclam-rej:hover { background: #991b1b; }
+  textarea { background: #0f172a; border: 1px solid #334155; color: #f1f5f9; border-radius: 8px; padding: 8px 12px; width: 100%; font-size: .9rem; resize: vertical; }
+  textarea:focus { outline: none; border-color: #2563eb; }
 </style>
 </head>
 <body>
@@ -106,6 +128,7 @@
     </div>
     <div class="flex items-center gap-4">
       <div id="hdr-sessao-status" class="text-xs text-slate-400">Sem sessão ativa</div>
+      <button id="btn-abrir-cadastro-prop" class="btn-primary btn-sm">📝 Cadastrar Proposição</button>
       <button id="btn-logout-admin" class="text-slate-500 text-sm hover:text-white transition">Sair</button>
     </div>
   </header>
@@ -125,6 +148,27 @@
             class="btn-primary btn-danger btn-sm mt-3 w-full">
             Encerrar Sessão
           </button>
+        </div>
+
+        <!-- Fase indicator -->
+        <div id="bloco-fase" class="hidden mb-4">
+          <div class="flex items-center mb-3 px-1">
+            <div class="fase-step" id="fase-pequeno-exp">
+              <div class="fase-step-circle">1</div>
+              <span class="fase-step-label">Peq. Expediente</span>
+            </div>
+            <div class="fase-conn" id="conn-1"></div>
+            <div class="fase-step" id="fase-expediente">
+              <div class="fase-step-circle">2</div>
+              <span class="fase-step-label">Expediente</span>
+            </div>
+            <div class="fase-conn" id="conn-2"></div>
+            <div class="fase-step" id="fase-ordem-dia">
+              <div class="fase-step-circle">3</div>
+              <span class="fase-step-label">Ordem do Dia</span>
+            </div>
+          </div>
+          <button id="btn-avancar-fase" class="btn-primary btn-sm w-full" style="background:#7c3aed">⏭ Avançar Fase</button>
         </div>
 
         <div id="form-sessao" class="space-y-3">
@@ -184,12 +228,19 @@
 
       <!-- ── Card: Adicionar Item ───────────────────────────── -->
       <div class="card">
-        <div class="card-title">➕ Adicionar Item à Pauta</div>
+        <div class="card-title">➕ Adicionar à Pauta</div>
         <div class="space-y-3">
           <div>
             <label>Proposição</label>
             <select id="sel-proposicao">
               <option value="">— Selecione —</option>
+            </select>
+          </div>
+          <div>
+            <label>Parte da Sessão</label>
+            <select id="sel-parte-item">
+              <option value="expediente">Expediente</option>
+              <option value="ordem_do_dia">Ordem do Dia</option>
             </select>
           </div>
           <div>
@@ -200,21 +251,78 @@
               <option value="secreta">Secreta</option>
             </select>
           </div>
-          <button id="btn-add-item" class="btn-primary w-full">Adicionar à Ordem do Dia</button>
+          <button id="btn-add-item" class="btn-primary w-full">Adicionar à Pauta</button>
         </div>
       </div>
     </div>
 
-    <!-- ── Card: Ordem do Dia ─────────────────────────────── -->
+    <!-- ── Card: Pauta da Sessão ──────────────────────────── -->
     <div class="card">
-      <div class="card-title">📄 Ordem do Dia
+      <div class="card-title">📄 Pauta da Sessão
         <span id="sessao-badge-od" class="text-slate-500 text-xs normal-case font-normal"></span>
       </div>
-      <div id="lista-od" class="space-y-2">
-        <p class="text-slate-500 text-sm text-center py-8">Inicie uma sessão para ver a ordem do dia.</p>
+      <div id="sec-expediente" class="hidden">
+        <div class="sec-title">📎 Expediente</div>
+        <div id="lista-expediente" class="space-y-2"></div>
+      </div>
+      <div id="sec-ordem-dia">
+        <div id="divider-ordem-dia" class="hidden" style="border-top:1px solid #334155;padding-top:12px;margin-top:16px">
+          <div class="sec-title">📋 Ordem do Dia</div>
+        </div>
+        <div id="lista-od" class="space-y-2">
+          <p class="text-slate-500 text-sm text-center py-8">Inicie uma sessão para ver a ordem do dia.</p>
+        </div>
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Modal: Cadastrar Proposição -->
+<div id="modal-cadastro-prop" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150;display:none;align-items:center;justify-content:center;padding:16px">
+  <div class="card w-full max-w-lg" style="max-height:90vh;overflow-y:auto">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-white font-bold text-base">📝 Cadastrar Nova Proposição</h2>
+      <button onclick="fecharCadastroProp()" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+    </div>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label>Tipo</label>
+          <select id="inp-nova-tipo">
+            <option value="Projeto de Lei">Projeto de Lei (PL)</option>
+            <option value="Projeto de Lei Complementar">Proj. Lei Comp. (PLC)</option>
+            <option value="Decreto Legislativo">Decreto Legislativo</option>
+            <option value="Resolução">Resolução</option>
+            <option value="Indicação">Indicação</option>
+            <option value="Moção">Moção</option>
+            <option value="Requerimento">Requerimento</option>
+          </select>
+        </div>
+        <div>
+          <label>Número</label>
+          <input id="inp-nova-numero" type="text" placeholder="001">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label>Ano</label>
+          <input id="inp-nova-ano" type="number" placeholder="2024">
+        </div>
+        <div>
+          <label>Autor</label>
+          <input id="inp-nova-autor" type="text" placeholder="Nome do autor">
+        </div>
+      </div>
+      <div>
+        <label>Ementa</label>
+        <textarea id="inp-nova-ementa" rows="3" placeholder="Descrição da proposição..."></textarea>
+      </div>
+      <div class="flex gap-3 pt-1">
+        <button id="btn-cadastrar-prop" class="btn-primary flex-1">💾 Cadastrar</button>
+        <button onclick="fecharCadastroProp()" class="btn-primary btn-gray flex-1">Cancelar</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -325,14 +433,17 @@ async function carregarSessaoAtiva() {
     hdrStatus.innerHTML = `<span class="badge-andamento status-badge">● Em andamento</span>`;
     document.getElementById('sessao-badge-od').textContent =
       `Sessão ${sessaoAtual.numero}`;
+    renderFaseSessao(sessaoAtual);
     await carregarOrdemDia();
     await carregarTribuna();
   } else {
     formSessao.classList.remove('hidden');
     infoSessao.classList.add('hidden');
     hdrStatus.textContent = 'Sem sessão ativa';
+    document.getElementById('bloco-fase').classList.add('hidden');
     document.getElementById('lista-od').innerHTML =
       '<p class="text-slate-500 text-sm text-center py-8">Inicie uma sessão para ver a ordem do dia.</p>';
+    document.getElementById('sec-expediente').classList.add('hidden');
     // Pré-fill data
     document.getElementById('inp-data-sessao').valueAsDate = new Date();
   }
@@ -365,81 +476,105 @@ document.getElementById('btn-encerrar-sessao').addEventListener('click', async (
 // ── Ordem do Dia ──────────────────────────────────────────
 async function carregarOrdemDia() {
   if (!sessaoAtual) return;
-  const json = await api('ordem_dia.php', 'listar', null);
-  // GET with query param
   const r = await fetch(`${BASE}/api/ordem_dia.php?action=listar&sessao_id=${sessaoAtual.id}`);
   const data = await r.json();
   renderOrdemDia(data.data || []);
 }
 
 function renderOrdemDia(items) {
-  const lista = document.getElementById('lista-od');
-  if (!items.length) {
-    lista.innerHTML = '<p class="text-slate-500 text-sm text-center py-6">Nenhum item na pauta. Adicione proposições acima.</p>';
-    return;
+  const expItems = items.filter(i => i.parte === 'expediente');
+  const odItems  = items.filter(i => !i.parte || i.parte === 'ordem_do_dia');
+
+  const secExp    = document.getElementById('sec-expediente');
+  const listaExp  = document.getElementById('lista-expediente');
+  const dividerOD = document.getElementById('divider-ordem-dia');
+  const listaOD   = document.getElementById('lista-od');
+
+  if (expItems.length) {
+    secExp.classList.remove('hidden');
+    listaExp.innerHTML = expItems.map(i => renderItem(i, true)).join('');
+  } else {
+    secExp.classList.add('hidden');
   }
 
-  lista.innerHTML = items.map(item => {
-    const badgeMap = {
-      pendente:      ['badge-pendente','Pendente'],
-      em_discussao:  ['badge-discussao','Discussão'],
-      votando:       ['badge-votando','VOTANDO'],
-      encerrada:     ['badge-encerrada','Encerrada'],
-    };
-    const [badgeCls, badgeTxt] = badgeMap[item.status_votacao] || ['badge-pendente','Pendente'];
+  dividerOD.classList.toggle('hidden', expItems.length === 0);
 
-    let resultadoBadge = '';
-    if (item.resultado === 'aprovado')  resultadoBadge = '<span class="text-green-400 text-xs font-bold ml-2">✓ Aprovado</span>';
-    if (item.resultado === 'rejeitado') resultadoBadge = '<span class="text-red-400 text-xs font-bold ml-2">✗ Rejeitado</span>';
-    if (item.resultado === 'empate')    resultadoBadge = '<span class="text-blue-400 text-xs font-bold ml-2">≈ Empate</span>';
+  if (odItems.length) {
+    listaOD.innerHTML = odItems.map(i => renderItem(i, false)).join('');
+  } else {
+    listaOD.innerHTML = !items.length
+      ? '<p class="text-slate-500 text-sm text-center py-6">Nenhum item na pauta. Adicione proposições acima.</p>'
+      : '<p class="text-slate-500 text-sm text-center py-4 text-xs">Nenhum item na Ordem do Dia.</p>';
+  }
+}
 
-    let botoes = '';
-    if (item.status_votacao === 'pendente') {
-      botoes = `
-        <button onclick="iniciarDiscussao(${item.id})" class="btn-primary btn-sm" style="background:#7c3aed">💬 Discutir</button>
-        <button onclick="abrirVotacao(${item.id})" class="btn-primary btn-sm btn-warn">🗳️ Abrir Votação</button>
-      `;
-    } else if (item.status_votacao === 'em_discussao') {
-      botoes = `
-        <button onclick="abrirVotacao(${item.id})" class="btn-primary btn-sm btn-warn">🗳️ Abrir Votação</button>
-      `;
-    } else if (item.status_votacao === 'votando') {
-      botoes = `
-        <button onclick="encerrarVotacao(${item.id})" class="btn-primary btn-sm btn-danger">⏹ Encerrar Votação</button>
-      `;
-    }
+function renderItem(item, isExpediente) {
+  const badgeMap = {
+    pendente:      ['badge-pendente','Pendente'],
+    em_discussao:  ['badge-discussao','Discussão'],
+    votando:       ['badge-votando','VOTANDO'],
+    encerrada:     ['badge-encerrada','Encerrada'],
+  };
+  const [badgeCls, badgeTxt] = badgeMap[item.status_votacao] || ['badge-pendente','Pendente'];
 
-    const total = Number(item.total_vereadores) || 0;
-    const computados = Number(item.votos_computados) || 0;
-    const todosVotaram = item.status_votacao === 'votando' && total > 0 && computados >= total;
-    const avisoVotos = item.status_votacao === 'votando'
-      ? todosVotaram
-        ? `<div class="mt-2 flex items-center gap-2 bg-green-950 border border-green-600 rounded-lg px-3 py-2">
-             <span class="text-green-400 text-sm font-bold">✅ Todos os ${total} vereadores já votaram — você pode encerrar a votação.</span>
-           </div>`
-        : `<div class="mt-2 text-slate-400 text-xs">${computados} de ${total} vereador(es) votaram</div>`
-      : '';
+  let resultadoBadge = '';
+  if (item.resultado === 'aprovado' && item.tipo_aprovacao === 'aclamacao')
+    resultadoBadge = '<span class="text-green-400 text-xs font-bold ml-2">✓ Aprovado (aclamação)</span>';
+  else if (item.resultado === 'rejeitado' && item.tipo_aprovacao === 'aclamacao')
+    resultadoBadge = '<span class="text-red-400 text-xs font-bold ml-2">✗ Rejeitado (aclamação)</span>';
+  else if (item.resultado === 'aprovado')  resultadoBadge = '<span class="text-green-400 text-xs font-bold ml-2">✓ Aprovado</span>';
+  else if (item.resultado === 'rejeitado') resultadoBadge = '<span class="text-red-400 text-xs font-bold ml-2">✗ Rejeitado</span>';
+  else if (item.resultado === 'empate')    resultadoBadge = '<span class="text-blue-400 text-xs font-bold ml-2">≈ Empate</span>';
 
-    return `
-      <div class="item-od ${item.status_votacao === 'votando' ? 'ativo' : ''}">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-slate-500 text-xs font-mono">${item.ordem_exibicao}.</span>
-            <span class="status-badge ${badgeCls}">${badgeTxt}</span>
-            ${resultadoBadge}
-            ${item.votos_sim ? `<span class="text-slate-400 text-xs">(${item.votos_sim}S ${item.votos_nao}N ${item.votos_abstencao}A)</span>` : ''}
-          </div>
-          <div class="flex gap-2 flex-wrap">${botoes}</div>
+  const aclBotoes = isExpediente && (item.status_votacao === 'pendente' || item.status_votacao === 'em_discussao')
+    ? `<button onclick="aprovarAclamacao(${item.id})" class="btn-primary btn-sm btn-aclam-sim">✓ Aclamação</button>
+       <button onclick="rejeitarAclamacao(${item.id})" class="btn-primary btn-sm btn-aclam-rej">✗ Aclamação</button>`
+    : '';
+
+  let botoes = '';
+  if (item.status_votacao === 'pendente') {
+    botoes = `
+      <button onclick="iniciarDiscussao(${item.id})" class="btn-primary btn-sm" style="background:#7c3aed">💬 Discutir</button>
+      <button onclick="abrirVotacao(${item.id})" class="btn-primary btn-sm btn-warn">🗳️ Abrir Votação</button>
+      ${aclBotoes}`;
+  } else if (item.status_votacao === 'em_discussao') {
+    botoes = `
+      <button onclick="abrirVotacao(${item.id})" class="btn-primary btn-sm btn-warn">🗳️ Abrir Votação</button>
+      ${aclBotoes}`;
+  } else if (item.status_votacao === 'votando') {
+    botoes = `<button onclick="encerrarVotacao(${item.id})" class="btn-primary btn-sm btn-danger">⏹ Encerrar Votação</button>`;
+  }
+
+  const total = Number(item.total_vereadores) || 0;
+  const computados = Number(item.votos_computados) || 0;
+  const todosVotaram = item.status_votacao === 'votando' && total > 0 && computados >= total;
+  const avisoVotos = item.status_votacao === 'votando'
+    ? todosVotaram
+      ? `<div class="mt-2 flex items-center gap-2 bg-green-950 border border-green-600 rounded-lg px-3 py-2">
+           <span class="text-green-400 text-sm font-bold">✅ Todos os ${total} vereadores já votaram — você pode encerrar a votação.</span>
+         </div>`
+      : `<div class="mt-2 text-slate-400 text-xs">${computados} de ${total} vereador(es) votaram</div>`
+    : '';
+
+  return `
+    <div class="item-od ${item.status_votacao === 'votando' ? 'ativo' : ''}">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-slate-500 text-xs font-mono">${item.ordem_exibicao}.</span>
+          <span class="status-badge ${badgeCls}">${badgeTxt}</span>
+          ${resultadoBadge}
+          ${item.votos_sim && item.tipo_aprovacao !== 'aclamacao' ? `<span class="text-slate-400 text-xs">(${item.votos_sim}S ${item.votos_nao}N ${item.votos_abstencao}A)</span>` : ''}
         </div>
-        <div class="mt-2">
-          <p class="text-white text-sm font-semibold">${escHtml(item.tipo)} nº ${escHtml(item.numero)}/${escHtml(item.ano)}</p>
-          <p class="text-slate-400 text-xs mt-1 leading-relaxed">${escHtml(item.ementa)}</p>
-          ${item.autor ? `<p class="text-slate-500 text-xs mt-1">Autoria: ${escHtml(item.autor)}</p>` : ''}
-        </div>
-        ${avisoVotos}
+        <div class="flex gap-2 flex-wrap">${botoes}</div>
       </div>
-    `;
-  }).join('');
+      <div class="mt-2">
+        <p class="text-white text-sm font-semibold">${escHtml(item.tipo)} nº ${escHtml(item.numero)}/${escHtml(item.ano)}</p>
+        <p class="text-slate-400 text-xs mt-1 leading-relaxed">${escHtml(item.ementa)}</p>
+        ${item.autor ? `<p class="text-slate-500 text-xs mt-1">Autoria: ${escHtml(item.autor)}</p>` : ''}
+      </div>
+      ${avisoVotos}
+    </div>
+  `;
 }
 
 async function iniciarDiscussao(id) {
@@ -492,18 +627,64 @@ async function carregarProposicoes() {
 
 document.getElementById('btn-add-item').addEventListener('click', async () => {
   if (!sessaoAtual) { toast('Inicie uma sessão primeiro.', 'error'); return; }
-  const propId = document.getElementById('sel-proposicao').value;
+
+  const propId  = document.getElementById('sel-proposicao').value;
+  const parte   = document.getElementById('sel-parte-item').value;
   const tipoVot = document.getElementById('sel-tipo-votacao').value;
+
   if (!propId) { toast('Selecione uma proposição.', 'error'); return; }
 
   const json = await fetch(`${BASE}/api/ordem_dia.php?action=adicionar`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessao_id: sessaoAtual.id, proposicao_id: Number(propId), tipo_votacao: tipoVot }),
+    body: JSON.stringify({ sessao_id: sessaoAtual.id, proposicao_id: Number(propId), tipo_votacao: tipoVot, parte }),
   }).then(r => r.json());
 
   if (!json.success) { toast(json.error, 'error'); return; }
   toast('Item adicionado à pauta.');
   await carregarOrdemDia();
+});
+
+function abrirCadastroProp() {
+  const m = document.getElementById('modal-cadastro-prop');
+  m.style.display = 'flex';
+  m.classList.remove('hidden');
+}
+function fecharCadastroProp() {
+  const m = document.getElementById('modal-cadastro-prop');
+  m.style.display = 'none';
+}
+
+document.getElementById('modal-cadastro-prop').addEventListener('click', e => {
+  if (e.target === e.currentTarget) fecharCadastroProp();
+});
+
+document.getElementById('btn-abrir-cadastro-prop').addEventListener('click', abrirCadastroProp);
+
+document.getElementById('btn-cadastrar-prop').addEventListener('click', async () => {
+  const tipo   = document.getElementById('inp-nova-tipo').value;
+  const numero = document.getElementById('inp-nova-numero').value.trim();
+  const ano    = parseInt(document.getElementById('inp-nova-ano').value) || 0;
+  const ementa = document.getElementById('inp-nova-ementa').value.trim();
+  const autor  = document.getElementById('inp-nova-autor').value.trim();
+
+  if (!numero || !ano || !ementa) { toast('Preencha número, ano e ementa.', 'error'); return; }
+
+  const json = await fetch(`${BASE}/api/ordem_dia.php?action=cadastrar_proposicao`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo, numero, ano, ementa, autor }),
+  }).then(r => r.json());
+
+  if (!json.success) { toast(json.error, 'error'); return; }
+
+  fecharCadastroProp();
+  toast(`✓ ${tipo} nº ${numero}/${ano} cadastrada!`);
+
+  document.getElementById('inp-nova-numero').value = '';
+  document.getElementById('inp-nova-ementa').value = '';
+  document.getElementById('inp-nova-autor').value  = '';
+
+  await carregarProposicoes();
+  document.getElementById('sel-proposicao').value = json.data.id;
 });
 
 // ── Tribuna ────────────────────────────────────────────────
@@ -617,6 +798,79 @@ function iniciarPolling() {
     await carregarOrdemDia();
     await carregarTribuna();
   }, 2000);
+}
+
+// ── Fase da sessão ────────────────────────────────────────
+function renderFaseSessao(sessao) {
+  const blocoFase = document.getElementById('bloco-fase');
+  if (!sessao) { blocoFase.classList.add('hidden'); return; }
+  blocoFase.classList.remove('hidden');
+
+  const parte = sessao.parte_atual ?? null;
+  const idxAtual = parte === null ? 0 : parte === 'expediente' ? 1 : 2;
+
+  ['fase-pequeno-exp', 'fase-expediente', 'fase-ordem-dia'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('ativa', 'concluida');
+    if (i < idxAtual)      el.classList.add('concluida');
+    else if (i === idxAtual) el.classList.add('ativa');
+  });
+
+  ['conn-1', 'conn-2'].forEach((id, i) => {
+    document.getElementById(id).classList.toggle('concluida', i < idxAtual);
+  });
+
+  const btnAv = document.getElementById('btn-avancar-fase');
+  if (parte === 'ordem_do_dia') {
+    btnAv.disabled = true;
+    btnAv.textContent = '✓ Fase Final';
+  } else {
+    btnAv.disabled = false;
+    btnAv.textContent = parte === null ? '⏭ Avançar para Expediente' : '⏭ Avançar para Ordem do Dia';
+  }
+}
+
+document.getElementById('btn-avancar-fase').addEventListener('click', async () => {
+  if (!sessaoAtual) return;
+  const mapa = { null: 'expediente', 'expediente': 'ordem_do_dia' };
+  const proximaParte = mapa[sessaoAtual.parte_atual ?? null];
+  if (!proximaParte) return;
+  const nomeLabel = proximaParte === 'expediente' ? 'Expediente' : 'Ordem do Dia';
+  if (!confirm(`Avançar para a fase: ${nomeLabel}?`)) return;
+
+  const json = await fetch(`${BASE}/api/sessoes.php?action=avancar_parte`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessao_id: sessaoAtual.id, parte: proximaParte }),
+  }).then(r => r.json());
+
+  if (!json.success) { toast(json.error, 'error'); return; }
+  sessaoAtual.parte_atual = json.data.parte_atual;
+  renderFaseSessao(sessaoAtual);
+  toast(`Fase avançada: ${nomeLabel}`);
+  await carregarOrdemDia();
+});
+
+// ── Aclamação ─────────────────────────────────────────────
+async function aprovarAclamacao(id) {
+  if (!confirm('Aprovar por aclamação?')) return;
+  const json = await fetch(`${BASE}/api/ordem_dia.php?action=aprovar_aclamacao`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  }).then(r => r.json());
+  if (!json.success) { toast(json.error, 'error'); return; }
+  toast('✓ Aprovado por aclamação.');
+  await carregarOrdemDia();
+}
+
+async function rejeitarAclamacao(id) {
+  if (!confirm('Rejeitar por aclamação?')) return;
+  const json = await fetch(`${BASE}/api/ordem_dia.php?action=rejeitar_aclamacao`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  }).then(r => r.json());
+  if (!json.success) { toast(json.error, 'error'); return; }
+  toast('✗ Rejeitado por aclamação.');
+  await carregarOrdemDia();
 }
 
 // ── Utilitários ───────────────────────────────────────────

@@ -22,7 +22,7 @@ switch ($action) {
             FROM   ordem_do_dia od
             JOIN   proposicoes   p ON p.id = od.proposicao_id
             WHERE  od.sessao_id = ?
-            ORDER  BY od.ordem_exibicao ASC
+            ORDER  BY FIELD(od.parte, 'expediente', 'ordem_do_dia') ASC, od.ordem_exibicao ASC
         ");
         $stmt->execute([$sessaoId]);
         $items = $stmt->fetchAll();
@@ -34,6 +34,36 @@ switch ($action) {
         }
 
         jsonSuccess($items);
+
+    // ── Cadastrar nova proposição ─────────────────────────────
+    case 'cadastrar_proposicao':
+        requireAdminAuth();
+
+        $numero = (string)requiredInput('numero');
+        $ano    = (int)requiredInput('ano');
+        $tipo   = (string)requiredInput('tipo');
+        $ementa = (string)requiredInput('ementa');
+        $autor  = (string)input('autor', '');
+
+        $tiposValidos = [
+            'Projeto de Lei','Projeto de Lei Complementar','Requerimento',
+            'Indicação','Moção','Decreto Legislativo','Resolução',
+        ];
+        if (!in_array($tipo, $tiposValidos)) jsonError('Tipo de proposição inválido.');
+
+        try {
+            $stmt = db()->prepare("
+                INSERT INTO proposicoes (numero, ano, tipo, ementa, autor)
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$numero, $ano, $tipo, $ementa, $autor ?: null]);
+            $propId = (int)db()->lastInsertId();
+        } catch (\PDOException $e) {
+            if ($e->getCode() === '23000') jsonError('Proposição com esse número/ano/tipo já existe.');
+            throw $e;
+        }
+
+        jsonSuccess(['id' => $propId, 'numero' => $numero, 'ano' => $ano, 'tipo' => $tipo]);
 
     // ── Detalhe de um item ────────────────────────────────────
     case 'item':
@@ -89,11 +119,14 @@ switch ($action) {
         $stmt->execute([$sessaoId]);
         $prox = (int)$stmt->fetchColumn();
 
+        $parte = input('parte', 'ordem_do_dia');
+        if (!in_array($parte, ['expediente', 'ordem_do_dia'])) $parte = 'ordem_do_dia';
+
         $stmt = db()->prepare("
-            INSERT INTO ordem_do_dia (sessao_id, proposicao_id, ordem_exibicao, tipo_votacao)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO ordem_do_dia (sessao_id, proposicao_id, ordem_exibicao, tipo_votacao, parte)
+            VALUES (?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$sessaoId, $proposicaoId, $prox, $tipoVotacao]);
+        $stmt->execute([$sessaoId, $proposicaoId, $prox, $tipoVotacao, $parte]);
 
         jsonSuccess(['id' => (int)db()->lastInsertId(), 'ordem_exibicao' => $prox]);
 
@@ -246,6 +279,56 @@ switch ($action) {
             'resultado' => $resultado,
             'placar'    => ['sim' => $sim, 'nao' => $nao, 'abstencao' => $abst],
         ]);
+
+    // ── Aprovar por aclamação ─────────────────────────────────
+    case 'aprovar_aclamacao':
+    case 'rejeitar_aclamacao':
+        requireAdminAuth();
+
+        $id = (int)requiredInput('id');
+        $resultado = ($action === 'aprovar_aclamacao') ? 'aprovado' : 'rejeitado';
+
+        $stmt = db()->prepare("
+            SELECT od.id, od.proposicao_id, od.sessao_id, od.parte
+            FROM   ordem_do_dia od
+            JOIN   sessoes_plenarias s ON s.id = od.sessao_id
+            WHERE  od.id = ? AND od.status_votacao IN ('pendente','em_discussao')
+              AND  od.parte = 'expediente'
+              AND  s.tenant_id = ?
+        ");
+        $stmt->execute([$id, tenantId()]);
+        $od = $stmt->fetch();
+        if (!$od) jsonError('Item não encontrado, já processado ou não pertence ao Expediente.');
+
+        db()->prepare("
+            UPDATE ordem_do_dia
+            SET    status_votacao  = 'encerrada',
+                   resultado       = ?,
+                   tipo_aprovacao  = 'aclamacao',
+                   encerrado_em    = NOW()
+            WHERE  id = ?
+        ")->execute([$resultado, $id]);
+
+        db()->prepare("
+            INSERT INTO tramitacao_proposicoes
+                (proposicao_id, sessao_id, ordem_dia_id, evento, descricao, resultado,
+                 votos_sim, votos_nao, votos_abstencao, detalhes_json)
+            VALUES (?, ?, ?, 'ACLAMACAO', ?, ?, 0, 0, 0, '{}')
+        ")->execute([
+            $od['proposicao_id'],
+            $od['sessao_id'],
+            $id,
+            ucfirst($resultado) . ' por aclamação.',
+            $resultado,
+        ]);
+
+        if (in_array($resultado, ['aprovado', 'rejeitado'])) {
+            db()->prepare(
+                "UPDATE proposicoes SET status = ? WHERE id = ?"
+            )->execute([$resultado, $od['proposicao_id']]);
+        }
+
+        jsonSuccess(['resultado' => $resultado, 'tipo_aprovacao' => 'aclamacao']);
 
     default:
         jsonError('Ação inválida.');
